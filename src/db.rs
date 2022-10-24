@@ -9,6 +9,7 @@ pub struct DB {
     response_receive: Receiver<Result<Vec<Book>, String>>,
 }
 
+#[derive(Debug)]
 pub struct Book {
     pub title: String,
     pub authors: String,
@@ -16,7 +17,7 @@ pub struct Book {
     pub year: String,
     pub language: String,
     pub publisher: String,
-    pub sizeinbytes: String,
+    pub sizeinbytes: i64,
     pub format: String,
     pub locator: String,
 }
@@ -67,7 +68,8 @@ impl DB {
         let stmt = String::from("
         SELECT f.title, f.authors, f.series, f.year, f.language, f.publisher, f.sizeinbytes, f.format, f.locator 
         FROM fiction_fts ft JOIN fiction f ON f.title = ft.title 
-        WHERE fiction_fts MATCH '?'
+        WHERE fiction_fts MATCH ?1
+        LIMIT 10
         ");
         let params = vec![query.to_owned()];
         self.query_send.send(Query { stmt, params }).unwrap();
@@ -84,9 +86,10 @@ impl DB {
 }
 
 fn execute(connection: &rusqlite::Connection, query: &Query) -> Result<Vec<Book>, rusqlite::Error> {
+    println!("Executing query: {}", query.stmt);
     let mut stmt = connection.prepare(&query.stmt)?;
     let rows = stmt.query(rusqlite::params_from_iter(query.params.iter()))?;
-    rows.mapped(|row| {
+    let result = rows.mapped(|row| {
         Ok(Book {
             title: row.get(0)?,
             authors: row.get(1)?,
@@ -99,5 +102,7 @@ fn execute(connection: &rusqlite::Connection, query: &Query) -> Result<Vec<Book>
             locator: row.get(8)?,
         })
     })
-    .collect()
+    .collect();
+    println!("Query result: {:?}", result);
+    result
 }
