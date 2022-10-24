@@ -12,6 +12,8 @@ rust-version = "1.64"
 egui = "0.19.0"
 eframe = { version = "0.19.0", features = ["persistence"] }
 serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
+egui_extras = "0.19.0"
+rusqlite = { version = "0.28.0", features = ["bundled"] }
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
