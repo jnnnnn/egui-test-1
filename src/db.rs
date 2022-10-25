@@ -1,12 +1,18 @@
 use std::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Arc,
+    },
     thread,
 };
+
+use rusqlite::InterruptHandle;
 
 pub struct DB {
     pub result: Option<Vec<Book>>,
     query_send: Sender<Query>,
     response_receive: Receiver<Result<Vec<Book>, String>>,
+    interrupt: Option<InterruptHandle>,
 }
 
 #[derive(Debug)]
@@ -36,22 +42,26 @@ impl DB {
         // print SQLite version
         println!("SQLite version: {}", rusqlite::version());
 
+        let connection = rusqlite::Connection::open(&conn);
+        if let Err(e) = connection {
+            eprintln!("Error opening database: {}", e);
+            return Self {
+                result: None,
+                query_send,
+                response_receive,
+                interrupt: None,
+            };
+        }
+        let connection = connection.unwrap();
+        let interrupt = Some(connection.get_interrupt_handle());
         // queries run in a separate thread
         // https://doc.rust-lang.org/rust-by-example/std_misc/channels.html
-        thread::spawn(move || {
-            let connection = rusqlite::Connection::open(&conn);
-            if let Err(e) = connection {
-                eprintln!("Error opening database: {}", e);
-                return;
-            }
-            let connection = connection.unwrap();
-            loop {
-                let query = query_receive.recv().unwrap();
-                let result = execute(&connection, &query);
-                match result {
-                    Ok(books) => response_send.send(Ok(books)).unwrap(),
-                    Err(e) => response_send.send(Err(e.to_string())).unwrap(),
-                }
+        thread::spawn(move || loop {
+            let query = query_receive.recv().unwrap();
+            let result = execute(&connection, &query);
+            match result {
+                Ok(books) => response_send.send(Ok(books)).unwrap(),
+                Err(e) => response_send.send(Err(e.to_string())).unwrap(),
             }
         });
 
@@ -59,6 +69,7 @@ impl DB {
             result: None,
             query_send,
             response_receive,
+            interrupt,
         }
     }
 
@@ -83,26 +94,34 @@ impl DB {
             Err(mpsc::TryRecvError::Disconnected) => None,
         }
     }
+
+    pub fn interrupt(&self) {
+        if let Some(interrupt) = &self.interrupt {
+            println!("Interrupting query");
+            interrupt.interrupt();
+        }
+    }
 }
 
 fn execute(connection: &rusqlite::Connection, query: &Query) -> Result<Vec<Book>, rusqlite::Error> {
     println!("Executing query: {}", query.stmt);
     let mut stmt = connection.prepare(&query.stmt)?;
     let rows = stmt.query(rusqlite::params_from_iter(query.params.iter()))?;
-    let result = rows.mapped(|row| {
-        Ok(Book {
-            title: row.get(0)?,
-            authors: row.get(1)?,
-            series: row.get(2)?,
-            year: row.get(3)?,
-            language: row.get(4)?,
-            publisher: row.get(5)?,
-            sizeinbytes: row.get(6)?,
-            format: row.get(7)?,
-            locator: row.get(8)?,
+    let result = rows
+        .mapped(|row| {
+            Ok(Book {
+                title: row.get(0)?,
+                authors: row.get(1)?,
+                series: row.get(2)?,
+                year: row.get(3)?,
+                language: row.get(4)?,
+                publisher: row.get(5)?,
+                sizeinbytes: row.get(6)?,
+                format: row.get(7)?,
+                locator: row.get(8)?,
+            })
         })
-    })
-    .collect();
+        .collect();
     println!("Query result: {:?}", result);
     result
 }

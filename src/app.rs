@@ -112,6 +112,7 @@ impl eframe::App for TemplateApp {
                 ui.label("Query: ");
                 if ui.text_edit_singleline(query).lost_focus() {
                     if let Some(db) = db {
+                        db.interrupt();
                         db.query(query);
                         *results = Err(String::from("Searching..."));
                     }
