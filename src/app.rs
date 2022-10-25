@@ -2,11 +2,13 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use egui_extras::{Size, TableBuilder};
 
-use crate::db;
+use crate::db::{
+    self,
+    Collection::{Fiction, NonFiction},
+};
 
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)] // if we add new fields, give them default values when deserializing old state
+#[serde(default)]
 pub struct TemplateApp {
     db_path: String,
     #[serde(skip)]
@@ -88,11 +90,11 @@ impl eframe::App for TemplateApp {
             });
 
             let mut changed = true;
-            let f = filters.collection == "fiction";
+            let f = filters.collection == Fiction;
             if ui.selectable_label(f, "Fiction").clicked() {
-                filters.collection = "fiction".to_owned();
+                filters.collection = Fiction
             } else if ui.selectable_label(!f, "Nonfiction").clicked() {
-                filters.collection = "nonfiction".to_owned();
+                filters.collection = NonFiction
             } else {
                 changed = false;
             }
@@ -166,25 +168,15 @@ fn render_filter(ui: &mut egui::Ui, label: &str, text: &mut String) -> bool {
 fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
     let mut tb = TableBuilder::new(ui);
     for col in COLUMNS.iter() {
-        match *col {
-            "Title" => {
-                tb = tb.column(Size::Remainder {
-                    range: (100.0, 3000.0),
-                })
-            }
-            "Year" | "Language" | "FileSize" | "Format" | "Publisher" => {
-                tb = tb.column(Size::Relative {
-                    fraction: 0.05,
-                    range: (20.0, 100.0),
-                })
-            }
-            _ => {
-                tb = tb.column(Size::Relative {
-                    fraction: 0.15,
-                    range: (100.0, 1000.0),
-                })
-            }
-        };
+        tb = tb.column(Size::Relative {
+            fraction: match *col {
+                "Title" => 0.35,
+                "Authors" | "Series" => 0.15,
+                "Download" => 0.1,
+                "Year" | "Language" | "FileSize" | "Format" | "Publisher" | &_ => 0.05,
+            },
+            range: (30.0, 3000.0),
+        });
     }
     tb.header(20.0, |mut header| {
         for col in COLUMNS.iter() {
@@ -206,7 +198,11 @@ fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
                 format!("{:.0}", books[i].sizeinbytes as f32 / 1024.0).as_str(),
             );
             render_text_cell(&mut row, books[i].format.as_str());
-            render_text_cell(&mut row, books[i].locator.as_str());
+            row.col(|ui| {
+                if ui.button("download").clicked() {
+                    // todo
+                }
+            });
         });
     });
 }

@@ -1,4 +1,5 @@
 use std::{
+    error,
     sync::{
         atomic::{AtomicBool, Ordering::Relaxed},
         mpsc::{self, Receiver, Sender},
@@ -35,9 +36,9 @@ pub struct Query {
     pub params: Params,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Params {
-    pub collection: String,
+    pub collection: Collection,
     pub title: String,
     pub authors: String,
     pub series: String,
@@ -45,20 +46,16 @@ pub struct Params {
     pub format: String,
 }
 
-impl Default for Params {
-    fn default() -> Self {
-        Self {
-            collection: "fiction".to_owned(),
-            title: "".to_owned(),
-            authors: "".to_owned(),
-            series: "".to_owned(),
-            language: "".to_owned(),
-            format: "".to_owned(),
-        }
-    }
+// Collection can be fiction or non-fiction
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub enum Collection {
+    #[default]
+    Fiction,
+    NonFiction,
 }
 
 impl DB {
+    // open a new DB connection.
     pub fn new(conn: &str) -> Self {
         let (query_send, query_receive) = mpsc::channel::<Query>();
         let (response_send, response_receive) = mpsc::channel::<Result<Vec<Book>, String>>();
@@ -85,39 +82,12 @@ impl DB {
         // https://doc.rust-lang.org/rust-by-example/std_misc/channels.html
         thread::spawn(move || loop {
             processing_clone.store(false, Relaxed);
-            let query = query_receive.recv().unwrap();
-            processing_clone.store(true, Relaxed);
-            println!("query: {:?}", query);
-            let stmt = connection.prepare(&query.stmt);
-            if let Err(e) = stmt {
-                eprintln!("Error preparing statement: {}", e);
-                response_send.send(Err(e.to_string())).unwrap();
-                continue;
-            }
-            let mut stmt = stmt.unwrap();
-            let rows = stmt.query(rusqlite::named_params!(
-                ":title": query.params.title,
-                ":authors": query.params.authors,
-                ":series": query.params.series,
-                ":language": query.params.language,
-                ":format": query.params.format,
-            ));
-            if let Err(e) = rows {
-                eprintln!("Error executing statement: {}", e);
-                response_send.send(Err(e.to_string())).unwrap();
-                continue;
-            }
-            let mut rows = rows.unwrap().mapped(|row| row_to_book(row));
-            loop {
-                match rows.next() {
-                    Some(Ok(book)) => {
-                        println!("Sending a book: {:}", book.title);
-                        response_send.send(Ok(vec![book])).unwrap();
+            if let Ok(query) = query_receive.recv() {
+                processing_clone.store(true, Relaxed);
+                if let Err(e) = start_query(&connection, &query, &response_send) {
+                    if let Err(e) = response_send.send(Err(e.to_string())) {
+                        eprintln!("Error sending error: {}", e);
                     }
-                    Some(Err(e)) => response_send
-                        .send(Err(format!("DB error: {:?}", e)))
-                        .unwrap(),
-                    None => break,
                 }
             }
         });
@@ -130,6 +100,7 @@ impl DB {
         }
     }
 
+    // add a query to the queue for the db thread to process
     pub fn query(&self, params: Params) {
         // https://www.sqlite.org/fts5.html
         // search the fiction_fts table for query
@@ -143,13 +114,16 @@ impl DB {
             f.language LIKE '%'||:language||'%' AND
             f.format LIKE '%'||:format||'%'
         ORDER BY f.authors, f.title, f.sizeinbytes
-        ", match params.collection.as_str() {
-            "nonfiction" => "non_fiction",
+        ", match params.collection {
+            Collection::NonFiction => "non_fiction",
             _ => "fiction",
         });
-        self.query_send.send(Query { stmt, params }).unwrap();
+        if let Err(e) = self.query_send.send(Query { stmt, params }) {
+            eprintln!("Error enqueueing query: {}", e);
+        }
     }
 
+    // see if there's a result available from the db thread
     pub fn get_result(&self) -> Option<Result<Vec<Book>, String>> {
         match self.response_receive.try_recv() {
             Ok(Ok(books)) => Some(Ok(books)),
@@ -159,10 +133,35 @@ impl DB {
         }
     }
 
+    // stop the currently executing query.
+    // It is also a good idea to drain the receive queue
+    // (keep calling get_result until nothing is left).
     pub fn interrupt(&self) {
         if let Some(interrupt) = &self.interrupt {
-            println!("Interrupting query");
             interrupt.interrupt();
+        }
+    }
+}
+
+fn start_query(
+    connection: &rusqlite::Connection,
+    query: &Query,
+    response_send: &Sender<Result<Vec<Book>, String>>,
+) -> Result<(), Box<dyn error::Error>> {
+    let mut stmt = connection.prepare(&query.stmt)?;
+    let rows = stmt.query(rusqlite::named_params!(
+        ":title": query.params.title,
+        ":authors": query.params.authors,
+        ":series": query.params.series,
+        ":language": query.params.language,
+        ":format": query.params.format,
+    ));
+    let mut rows = rows?.mapped(|row| row_to_book(row));
+    loop {
+        match rows.next() {
+            Some(Ok(book)) => response_send.send(Ok(vec![book]))?,
+            Some(Err(e)) => return Err(e.into()),
+            None => break Ok(()),
         }
     }
 }
