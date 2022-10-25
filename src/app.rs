@@ -81,7 +81,7 @@ impl eframe::App for TemplateApp {
         let Self {
             label: query,
             db_path,
-            value,
+            value: _,
             filters,
             db,
             results,
@@ -89,7 +89,16 @@ impl eframe::App for TemplateApp {
 
         if let Some(db) = db {
             match db.get_result() {
-                Some(Ok(books)) => *results = Ok(books),
+                Some(Ok(mut newbooks)) => match results {
+                    Ok(bookcache) => {
+                        while newbooks.len() > 0 {
+                            bookcache.push(newbooks.pop().unwrap());
+                        }
+                    }
+                    Err(_) => {
+                        *results = Ok(newbooks);
+                    }
+                },
                 Some(Err(e)) => *results = Err(e.to_string()),
                 None => {}
             }
@@ -118,20 +127,7 @@ impl eframe::App for TemplateApp {
                     }
                 }
             });
-            for col in COLUMNS.iter() {
-                ui.horizontal(|ui| {
-                    ui.label(col.label);
-                    let mut query = self
-                        .filters
-                        .get(col.label)
-                        .unwrap_or(&String::new())
-                        .to_owned();
-                    let e = ui.text_edit_singleline(&mut query);
-                    if e.changed() {
-                        self.filters.insert(col.label.to_owned(), query);
-                    }
-                });
-            }
+            render_filter(ui, String::from("Language"), filters)
         });
 
         egui::CentralPanel::default().show(ctx, |ui| match results {
@@ -142,6 +138,17 @@ impl eframe::App for TemplateApp {
             }
         });
     }
+}
+
+fn render_filter(ui: &mut egui::Ui, label: String, filters: &mut HashMap<String, String>) {
+    ui.horizontal(|ui| {
+        ui.label(label.to_owned());
+        let mut query = filters.get(&label).unwrap_or(&String::new()).to_owned();
+        let e = ui.text_edit_singleline(&mut query);
+        if e.changed() {
+            filters.insert(label.to_owned(), query);
+        }
+    });
 }
 
 fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
@@ -156,13 +163,26 @@ fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
             });
         }
     })
-    .body(|mut body| {
-        body.rows(30.0, 1000, |i, mut row| {
-            for col in COLUMNS.iter() {
-                row.col(|ui| {
-                    ui.label(format!("{}-{}", col.label, i));
-                });
-            }
+    .body(|body| {
+        body.rows(30.0, books.len(), |i, mut row| {
+            render_text_cell(&mut row, books[i].title.as_str());
+            render_text_cell(&mut row, books[i].authors.as_str());
+            render_text_cell(&mut row, books[i].series.as_str());
+            render_text_cell(&mut row, books[i].year.as_str());
+            render_text_cell(&mut row, books[i].language.as_str());
+            render_text_cell(&mut row, books[i].publisher.as_str());
+            render_text_cell(
+                &mut row,
+                format!("{:.2}", books[i].sizeinbytes as f32 / 1024.0).as_str(),
+            );
+            render_text_cell(&mut row, books[i].format.as_str());
+            render_text_cell(&mut row, books[i].locator.as_str());
         });
+    });
+}
+
+fn render_text_cell(row: &mut egui_extras::TableRow, text: &str) {
+    row.col(|ui| {
+        ui.label(text);
     });
 }

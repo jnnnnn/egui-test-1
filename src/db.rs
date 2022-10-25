@@ -1,12 +1,9 @@
 use std::{
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Arc,
-    },
+    sync::mpsc::{self, Receiver, Sender},
     thread,
 };
 
-use rusqlite::InterruptHandle;
+use rusqlite::{InterruptHandle, Row};
 
 pub struct DB {
     pub result: Option<Vec<Book>>,
@@ -28,6 +25,7 @@ pub struct Book {
     pub locator: String,
 }
 
+#[derive(Debug)]
 pub struct Query {
     pub stmt: String,
     pub params: Vec<String>,
@@ -58,10 +56,30 @@ impl DB {
         // https://doc.rust-lang.org/rust-by-example/std_misc/channels.html
         thread::spawn(move || loop {
             let query = query_receive.recv().unwrap();
-            let result = execute(&connection, &query);
-            match result {
-                Ok(books) => response_send.send(Ok(books)).unwrap(),
-                Err(e) => response_send.send(Err(e.to_string())).unwrap(),
+            println!("query: {:?}", query);
+            let stmt = connection.prepare(&query.stmt);
+            if let Err(e) = stmt {
+                eprintln!("Error preparing statement: {}", e);
+                response_send.send(Err(e.to_string())).unwrap();
+                continue;
+            }
+            let mut stmt = stmt.unwrap();
+            let rows = stmt.query(rusqlite::params_from_iter(query.params.iter()));
+            if let Err(e) = rows {
+                eprintln!("Error executing statement: {}", e);
+                response_send.send(Err(e.to_string())).unwrap();
+                continue;
+            }
+            let mut rows = rows.unwrap().mapped(|row| row_to_book(row));
+            loop {
+                match rows.next() {
+                    Some(Ok(book)) => {
+                        println!("Sending a book: {:}", book.title);
+                        response_send.send(Ok(vec![book])).unwrap();
+                    }
+                    Some(Err(e)) => response_send.send(Err(e.to_string())).unwrap(),
+                    None => break,
+                }
             }
         });
 
@@ -80,7 +98,6 @@ impl DB {
         SELECT f.title, f.authors, f.series, f.year, f.language, f.publisher, f.sizeinbytes, f.format, f.locator 
         FROM fiction_fts ft JOIN fiction f ON f.title = ft.title 
         WHERE fiction_fts MATCH ?1
-        LIMIT 10
         ");
         let params = vec![query.to_owned()];
         self.query_send.send(Query { stmt, params }).unwrap();
@@ -103,25 +120,16 @@ impl DB {
     }
 }
 
-fn execute(connection: &rusqlite::Connection, query: &Query) -> Result<Vec<Book>, rusqlite::Error> {
-    println!("Executing query: {}", query.stmt);
-    let mut stmt = connection.prepare(&query.stmt)?;
-    let rows = stmt.query(rusqlite::params_from_iter(query.params.iter()))?;
-    let result = rows
-        .mapped(|row| {
-            Ok(Book {
-                title: row.get(0)?,
-                authors: row.get(1)?,
-                series: row.get(2)?,
-                year: row.get(3)?,
-                language: row.get(4)?,
-                publisher: row.get(5)?,
-                sizeinbytes: row.get(6)?,
-                format: row.get(7)?,
-                locator: row.get(8)?,
-            })
-        })
-        .collect();
-    println!("Query result: {:?}", result);
-    result
+fn row_to_book(row: &Row<'_>) -> Result<Book, rusqlite::Error> {
+    Ok(Book {
+        title: row.get(0)?,
+        authors: row.get(1)?,
+        series: row.get(2)?,
+        year: row.get(3)?,
+        language: row.get(4)?,
+        publisher: row.get(5)?,
+        sizeinbytes: row.get(6)?,
+        format: row.get(7)?,
+        locator: row.get(8)?,
+    })
 }
