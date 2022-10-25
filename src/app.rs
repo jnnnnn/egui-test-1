@@ -2,9 +2,12 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use egui_extras::{Size, TableBuilder};
 
-use crate::db::{
-    self,
-    Collection::{Fiction, NonFiction},
+use crate::{
+    db::{
+        self,
+        Collection::{Fiction, NonFiction},
+    },
+    download,
 };
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -18,6 +21,8 @@ pub struct TemplateApp {
     #[serde(skip)]
     db: Option<db::DB>,
     #[serde(skip)]
+    download: download::Download,
+    #[serde(skip)]
     results: Result<Vec<db::Book>, String>,
 }
 
@@ -29,6 +34,7 @@ impl Default for TemplateApp {
             filters: db::Params::default(),
             db: None,
             results: Err(String::from("No results")),
+            download: download::Download::new(),
         }
     }
 }
@@ -66,6 +72,7 @@ impl eframe::App for TemplateApp {
             filters,
             db,
             results,
+            download,
         } = self;
 
         if let Some(db) = db {
@@ -126,6 +133,9 @@ impl eframe::App for TemplateApp {
                     }
                 ));
             }
+
+            ui.separator();
+            ui.label(format!("{:?}", download.settings));
         });
 
         egui::CentralPanel::default().show(ctx, |ui| match results {

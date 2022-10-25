@@ -46,7 +46,6 @@ pub struct Params {
     pub format: String,
 }
 
-// Collection can be fiction or non-fiction
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub enum Collection {
     #[default]
