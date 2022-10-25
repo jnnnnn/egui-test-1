@@ -14,6 +14,8 @@ eframe = { version = "0.19.0", features = ["persistence"] }
 serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
 egui_extras = "0.19.0"
 rusqlite = { version = "0.28.0", features = ["bundled"] }
+config = "0.13.2"
+crossbeam = { version = "0.8.2", features = ["crossbeam-channel"] }
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

@@ -2,12 +2,12 @@ use std::{
     error,
     sync::{
         atomic::{AtomicBool, Ordering::Relaxed},
-        mpsc::{self, Receiver, Sender},
         Arc,
     },
     thread,
 };
 
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use rusqlite::{InterruptHandle, Row};
 
 pub struct DB {
@@ -57,8 +57,8 @@ pub enum Collection {
 impl DB {
     // open a new DB connection.
     pub fn new(conn: &str) -> Self {
-        let (query_send, query_receive) = mpsc::channel::<Query>();
-        let (response_send, response_receive) = mpsc::channel::<Result<Vec<Book>, String>>();
+        let (query_send, query_receive) = unbounded::<Query>();
+        let (response_send, response_receive) = unbounded::<Result<Vec<Book>, String>>();
         let conn = conn.to_owned();
 
         let processing = Arc::new(AtomicBool::new(false));
@@ -128,8 +128,7 @@ impl DB {
         match self.response_receive.try_recv() {
             Ok(Ok(books)) => Some(Ok(books)),
             Ok(Err(err)) => Some(Err(err)),
-            Err(mpsc::TryRecvError::Empty) => None,
-            Err(mpsc::TryRecvError::Disconnected) => None,
+            Err(_) => None,
         }
     }
 
