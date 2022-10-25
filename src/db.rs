@@ -28,7 +28,16 @@ pub struct Book {
 #[derive(Debug)]
 pub struct Query {
     pub stmt: String,
-    pub params: Vec<String>,
+    pub params: Params,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Params {
+    pub title: String,
+    pub authors: String,
+    pub series: String,
+    pub language: String,
+    pub format: String,
 }
 
 impl DB {
@@ -64,7 +73,13 @@ impl DB {
                 continue;
             }
             let mut stmt = stmt.unwrap();
-            let rows = stmt.query(rusqlite::params_from_iter(query.params.iter()));
+            let rows = stmt.query(rusqlite::named_params!(
+                ":title": query.params.title,
+                ":authors": query.params.authors,
+                ":series": query.params.series,
+                ":language": query.params.language,
+                ":format": query.params.format,
+            ));
             if let Err(e) = rows {
                 eprintln!("Error executing statement: {}", e);
                 response_send.send(Err(e.to_string())).unwrap();
@@ -77,7 +92,9 @@ impl DB {
                         println!("Sending a book: {:}", book.title);
                         response_send.send(Ok(vec![book])).unwrap();
                     }
-                    Some(Err(e)) => response_send.send(Err(e.to_string())).unwrap(),
+                    Some(Err(e)) => response_send
+                        .send(Err(format!("DB error: {:?}", e)))
+                        .unwrap(),
                     None => break,
                 }
             }
@@ -91,15 +108,20 @@ impl DB {
         }
     }
 
-    pub fn query(&self, query: &str) {
+    pub fn query(&self, params: Params) {
         // https://www.sqlite.org/fts5.html
         // search the fiction_fts table for query
         let stmt = String::from("
         SELECT f.title, f.authors, f.series, f.year, f.language, f.publisher, f.sizeinbytes, f.format, f.locator 
-        FROM fiction_fts ft JOIN fiction f ON f.title = ft.title 
-        WHERE fiction_fts MATCH ?1
+        FROM fiction f
+        WHERE 
+            f.title LIKE '%'||:title||'%' AND 
+            f.authors LIKE '%'||:authors||'%' AND
+            f.series LIKE '%'||:series||'%' AND
+            f.language LIKE '%'||:language||'%' AND
+            f.format LIKE '%'||:format||'%'
+        ORDER BY f.authors, f.title, f.sizeinbytes
         ");
-        let params = vec![query.to_owned()];
         self.query_send.send(Query { stmt, params }).unwrap();
     }
 

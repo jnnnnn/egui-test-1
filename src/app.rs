@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use egui_extras::{Size, TableBuilder};
 
 use crate::db;
@@ -8,11 +6,10 @@ use crate::db;
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
-    label: String,
     db_path: String,
     #[serde(skip)] // don't persist this
     // map key -> query
-    filters: HashMap<String, String>,
+    filters: db::Params,
     #[serde(skip)]
     value: f32,
     #[serde(skip)]
@@ -24,10 +21,9 @@ pub struct TemplateApp {
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
-            label: "Hello World!".to_owned(),
             db_path: "".to_owned(),
             value: 2.7,
-            filters: HashMap::new(),
+            filters: db::Params::default(),
             db: None,
             results: Err(String::from("No results")),
         }
@@ -79,7 +75,6 @@ impl eframe::App for TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let Self {
-            label: query,
             db_path,
             value: _,
             filters,
@@ -117,17 +112,18 @@ impl eframe::App for TemplateApp {
                 }
             });
 
-            ui.horizontal(|ui| {
-                ui.label("Query: ");
-                if ui.text_edit_singleline(query).lost_focus() {
-                    if let Some(db) = db {
-                        db.interrupt();
-                        db.query(query);
-                        *results = Err(String::from("Searching..."));
-                    }
+            if render_filter(ui, String::from("Title"), &mut filters.title)
+                || render_filter(ui, String::from("Authors"), &mut filters.authors)
+                || render_filter(ui, String::from("Series"), &mut filters.series)
+                || render_filter(ui, String::from("Language"), &mut filters.language)
+                || render_filter(ui, String::from("Format"), &mut filters.format)
+            {
+                if let Some(db) = db {
+                    db.interrupt();
+                    db.query(filters.clone());
+                    *results = Err(String::from("Searching..."));
                 }
-            });
-            render_filter(ui, String::from("Language"), filters)
+            }
         });
 
         egui::CentralPanel::default().show(ctx, |ui| match results {
@@ -140,15 +136,14 @@ impl eframe::App for TemplateApp {
     }
 }
 
-fn render_filter(ui: &mut egui::Ui, label: String, filters: &mut HashMap<String, String>) {
+fn render_filter(ui: &mut egui::Ui, label: String, filter: &mut String) -> bool {
+    let mut result = false;
     ui.horizontal(|ui| {
         ui.label(label.to_owned());
-        let mut query = filters.get(&label).unwrap_or(&String::new()).to_owned();
-        let e = ui.text_edit_singleline(&mut query);
-        if e.changed() {
-            filters.insert(label.to_owned(), query);
-        }
+        let e = ui.text_edit_singleline(filter);
+        result = e.changed();
     });
+    return result;
 }
 
 fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
@@ -181,7 +176,7 @@ fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
     });
 }
 
-fn render_text_cell(row: &mut egui_extras::TableRow, text: &str) {
+fn render_text_cell(row: &mut egui_extras::TableRow<'_, '_>, text: &str) {
     row.col(|ui| {
         ui.label(text);
     });
