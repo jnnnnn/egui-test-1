@@ -1,15 +1,19 @@
 use std::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        atomic::{AtomicBool, Ordering::Relaxed},
+        mpsc::{self, Receiver, Sender},
+        Arc,
+    },
     thread,
 };
 
 use rusqlite::{InterruptHandle, Row};
 
 pub struct DB {
-    pub result: Option<Vec<Book>>,
     query_send: Sender<Query>,
     response_receive: Receiver<Result<Vec<Book>, String>>,
     interrupt: Option<InterruptHandle>,
+    pub processing: Arc<AtomicBool>,
 }
 
 #[derive(Debug)]
@@ -31,13 +35,27 @@ pub struct Query {
     pub params: Params,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Params {
+    pub collection: String,
     pub title: String,
     pub authors: String,
     pub series: String,
     pub language: String,
     pub format: String,
+}
+
+impl Default for Params {
+    fn default() -> Self {
+        Self {
+            collection: "fiction".to_owned(),
+            title: "".to_owned(),
+            authors: "".to_owned(),
+            series: "".to_owned(),
+            language: "".to_owned(),
+            format: "".to_owned(),
+        }
+    }
 }
 
 impl DB {
@@ -46,25 +64,29 @@ impl DB {
         let (response_send, response_receive) = mpsc::channel::<Result<Vec<Book>, String>>();
         let conn = conn.to_owned();
 
-        // print SQLite version
-        println!("SQLite version: {}", rusqlite::version());
+        let processing = Arc::new(AtomicBool::new(false));
 
         let connection = rusqlite::Connection::open(&conn);
         if let Err(e) = connection {
             eprintln!("Error opening database: {}", e);
             return Self {
-                result: None,
                 query_send,
                 response_receive,
                 interrupt: None,
+                processing,
             };
         }
         let connection = connection.unwrap();
         let interrupt = Some(connection.get_interrupt_handle());
+
+        let processing_clone = processing.clone();
+
         // queries run in a separate thread
         // https://doc.rust-lang.org/rust-by-example/std_misc/channels.html
         thread::spawn(move || loop {
+            processing_clone.store(false, Relaxed);
             let query = query_receive.recv().unwrap();
+            processing_clone.store(true, Relaxed);
             println!("query: {:?}", query);
             let stmt = connection.prepare(&query.stmt);
             if let Err(e) = stmt {
@@ -101,19 +123,19 @@ impl DB {
         });
 
         Self {
-            result: None,
             query_send,
             response_receive,
             interrupt,
+            processing,
         }
     }
 
     pub fn query(&self, params: Params) {
         // https://www.sqlite.org/fts5.html
         // search the fiction_fts table for query
-        let stmt = String::from("
+        let stmt = format!("
         SELECT f.title, f.authors, f.series, f.year, f.language, f.publisher, f.sizeinbytes, f.format, f.locator 
-        FROM fiction f
+        FROM {} f
         WHERE 
             f.title LIKE '%'||:title||'%' AND 
             f.authors LIKE '%'||:authors||'%' AND
@@ -121,7 +143,10 @@ impl DB {
             f.language LIKE '%'||:language||'%' AND
             f.format LIKE '%'||:format||'%'
         ORDER BY f.authors, f.title, f.sizeinbytes
-        ");
+        ", match params.collection.as_str() {
+            "nonfiction" => "non_fiction",
+            _ => "fiction",
+        });
         self.query_send.send(Query { stmt, params }).unwrap();
     }
 

@@ -1,3 +1,5 @@
+use std::sync::atomic::Ordering::Relaxed;
+
 use egui_extras::{Size, TableBuilder};
 
 use crate::db;
@@ -7,8 +9,7 @@ use crate::db;
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
     db_path: String,
-    #[serde(skip)] // don't persist this
-    // map key -> query
+    #[serde(skip)]
     filters: db::Params,
     #[serde(skip)]
     value: f32,
@@ -30,35 +31,18 @@ impl Default for TemplateApp {
     }
 }
 
-struct ColumnConfig {
-    width: f32,
-    label: &'static str,
-}
-
-impl ColumnConfig {
-    const fn new(label: &'static str) -> Self {
-        Self {
-            width: 100.0,
-            label,
-        }
-    }
-    const fn width(mut self, width: f32) -> Self {
-        self.width = width;
-        self
-    }
-}
-
-const COLUMNS: &[ColumnConfig] = &[
-    ColumnConfig::new("Title").width(300.0),
-    ColumnConfig::new("Authors"),
-    ColumnConfig::new("Series"),
-    ColumnConfig::new("Year"),
-    ColumnConfig::new("Language"),
-    ColumnConfig::new("Publisher"),
-    ColumnConfig::new("FileSize"),
-    ColumnConfig::new("Format"),
-    ColumnConfig::new("Download"),
+const COLUMNS: &'static [&'static str] = &[
+    "Title",
+    "Authors",
+    "Series",
+    "Year",
+    "Language",
+    "Publisher",
+    "FileSize",
+    "Format",
+    "Download",
 ];
+
 impl TemplateApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage {
@@ -84,16 +68,7 @@ impl eframe::App for TemplateApp {
 
         if let Some(db) = db {
             match db.get_result() {
-                Some(Ok(mut newbooks)) => match results {
-                    Ok(bookcache) => {
-                        while newbooks.len() > 0 {
-                            bookcache.push(newbooks.pop().unwrap());
-                        }
-                    }
-                    Err(_) => {
-                        *results = Ok(newbooks);
-                    }
-                },
+                Some(Ok(newbooks)) => read_results(results, newbooks, ctx),
                 Some(Err(e)) => *results = Err(e.to_string()),
                 None => {}
             }
@@ -112,17 +87,42 @@ impl eframe::App for TemplateApp {
                 }
             });
 
-            if render_filter(ui, String::from("Title"), &mut filters.title)
-                || render_filter(ui, String::from("Authors"), &mut filters.authors)
-                || render_filter(ui, String::from("Series"), &mut filters.series)
-                || render_filter(ui, String::from("Language"), &mut filters.language)
-                || render_filter(ui, String::from("Format"), &mut filters.format)
-            {
+            let mut changed = true;
+            let f = filters.collection == "fiction";
+            if ui.selectable_label(f, "Fiction").clicked() {
+                filters.collection = "fiction".to_owned();
+            } else if ui.selectable_label(!f, "Nonfiction").clicked() {
+                filters.collection = "nonfiction".to_owned();
+            } else {
+                changed = false;
+            }
+
+            changed |= render_filter(ui, "Title", &mut filters.title);
+            changed |= render_filter(ui, "Authors", &mut filters.authors);
+            changed |= render_filter(ui, "Series", &mut filters.series);
+            changed |= render_filter(ui, "Language", &mut filters.language);
+            changed |= render_filter(ui, "Format", &mut filters.format);
+
+            if changed {
                 if let Some(db) = db {
                     db.interrupt();
+                    while db.get_result().is_some() {}
                     db.query(filters.clone());
                     *results = Err(String::from("Searching..."));
                 }
+            }
+
+            if let Some(db) = db {
+                if db.processing.load(Relaxed) {
+                    ui.spinner();
+                }
+                ui.label(format!(
+                    "{} results",
+                    match results {
+                        Ok(v) => v.len(),
+                        _ => 0,
+                    }
+                ));
             }
         });
 
@@ -136,11 +136,28 @@ impl eframe::App for TemplateApp {
     }
 }
 
-fn render_filter(ui: &mut egui::Ui, label: String, filter: &mut String) -> bool {
+fn read_results(
+    results: &mut Result<Vec<db::Book>, String>,
+    mut newbooks: Vec<db::Book>,
+    ctx: &egui::Context,
+) {
+    if let Ok(bookcache) = results {
+        while newbooks.len() > 0 {
+            bookcache.push(newbooks.pop().unwrap());
+            // keep redrawing while results are available even if mouse is not moving
+            ctx.request_repaint();
+        }
+    } else {
+        // no previous results, just replace the previous error
+        *results = Ok(newbooks);
+    }
+}
+
+fn render_filter(ui: &mut egui::Ui, label: &str, text: &mut String) -> bool {
     let mut result = false;
     ui.horizontal(|ui| {
         ui.label(label.to_owned());
-        let e = ui.text_edit_singleline(filter);
+        let e = ui.text_edit_singleline(text);
         result = e.changed();
     });
     return result;
@@ -149,12 +166,30 @@ fn render_filter(ui: &mut egui::Ui, label: String, filter: &mut String) -> bool 
 fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
     let mut tb = TableBuilder::new(ui);
     for col in COLUMNS.iter() {
-        tb = tb.column(Size::exact(col.width));
+        match *col {
+            "Title" => {
+                tb = tb.column(Size::Remainder {
+                    range: (100.0, 3000.0),
+                })
+            }
+            "Year" | "Language" | "FileSize" | "Format" | "Publisher" => {
+                tb = tb.column(Size::Relative {
+                    fraction: 0.05,
+                    range: (20.0, 100.0),
+                })
+            }
+            _ => {
+                tb = tb.column(Size::Relative {
+                    fraction: 0.15,
+                    range: (100.0, 1000.0),
+                })
+            }
+        };
     }
     tb.header(20.0, |mut header| {
         for col in COLUMNS.iter() {
             header.col(|ui| {
-                ui.label(col.label);
+                ui.label(*col);
             });
         }
     })
@@ -168,7 +203,7 @@ fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
             render_text_cell(&mut row, books[i].publisher.as_str());
             render_text_cell(
                 &mut row,
-                format!("{:.2}", books[i].sizeinbytes as f32 / 1024.0).as_str(),
+                format!("{:.0}", books[i].sizeinbytes as f32 / 1024.0).as_str(),
             );
             render_text_cell(&mut row, books[i].format.as_str());
             render_text_cell(&mut row, books[i].locator.as_str());
