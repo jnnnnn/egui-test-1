@@ -127,9 +127,13 @@ async fn download_race(hosts: Vec<String>, content: String) -> Result<Bytes, Str
     // start a download for each host
     let mut set = JoinSet::<Result<Bytes, String>>::new();
 
-    for host in hosts {
+    for (i, host) in hosts.iter().enumerate() {
         let content = content.clone();
+        let host = host.clone();
         set.spawn(async move {
+            // give each endpoint an extra ten seconds to start
+            let delay = Duration::from_secs(10 * i as u64);
+            tokio::time::sleep(delay).await;
             download_file(content, host)
                 .await
                 .map_err(|e| e.to_string())
