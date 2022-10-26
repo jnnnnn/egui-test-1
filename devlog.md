@@ -23,4 +23,6 @@ would still like to try a better db interface, something like sqlx or diesel. al
 binary size 11mb. shrink:
  - cargo-bloat shows text 6Mb, no large packages. 
  - https://github.com/johnthagen/min-sized-rust suggests `strip = true ` and `opt-level = "z" `. These save a couple mb. 9mb.
- - unused-features dropped the binary to 5.3MiB but broke it badly. 
+ - unused-features dropped the binary to 5.3MiB but broke it badly. testing the app and added back enough to get it working again. 7.3MiB. 
+ - Done.
+
