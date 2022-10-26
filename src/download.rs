@@ -73,6 +73,7 @@ fn start_download(
     if path.exists() {
         status.description = f!("{book.title} already exists");
         status_send.send(status.clone())?;
+        println!("{} already exists at {}", book.title, path.display());
         return Ok(());
     }
 
@@ -101,6 +102,7 @@ fn start_download(
             status.description = f!("Writing {book.title} to disk");
             status_send.send(status.clone())?;
             std::fs::write(path, bytes)?;
+            println!("Wrote {}", path.display());
             status.completed += 1;
             status.description = f!("Downloaded {book.title}");
             status_send.send(status.clone())?;
@@ -140,21 +142,24 @@ async fn download_race(hosts: Vec<String>, content: String) -> Result<Bytes, Str
 }
 
 async fn download_file(content: String, host: String) -> Result<Bytes, Box<dyn error::Error>> {
-    println_f!("Downloading from {host}");
-    let pattern = f!("\"(https:\\/\\/{host}\\/ipfs\\/[^\"]+)");
+    let pattern = f!("\"(https://{host}/ipfs/[^\"]+)");
     let re = regex::Regex::new(&pattern)?;
     let captures = re.captures(&content).ok_or("No link found")?;
     let url = captures.get(1).ok_or("No link found")?.as_str();
 
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
         .build()?;
 
     let response = client.get(url).send().await?;
     if !response.status().is_success() {
         return Err(format!("Error downloading {}: {}", url, response.status()).into());
     }
-    response.bytes().await.map_err(|e| e.into())
+    let result = response.bytes().await.map_err(|e| e.into());
+    if result.is_ok() {
+        println_f!("Downloaded {}", url);
+    }
+    result
 }
 
 fn load_settings() -> Config {
