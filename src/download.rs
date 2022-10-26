@@ -2,7 +2,12 @@ use bytes::Bytes;
 use config::Config;
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use fstrings::{f, format_args_f, println_f};
-use std::{error, thread, time::Duration};
+use std::{
+    error,
+    path::{Path, PathBuf},
+    thread,
+    time::Duration,
+};
 use tokio::task::JoinSet;
 
 use crate::db::{Book, Collection};
@@ -28,8 +33,9 @@ impl Download {
 
         // run downloads off the UI thread
         thread::spawn(move || loop {
-            if let Ok(locator) = recv.recv() {
-                if let Err(e) = start_download(&locator, &mut status, &status_send, &config) {
+            if let Ok(book) = recv.recv() {
+                if let Err(e) = start_download(&book, &mut status, &status_send, &config) {
+                    eprintln!("Error downloading book {}: {}", book.title, e);
                     status.description = format!("Error: {}", e);
                     status.errors += 1;
                     if let Err(e) = status_send.send(status.clone()) {
@@ -68,7 +74,7 @@ fn start_download(
 
     let filename = filename(book);
     let download_path = config.get::<String>("downloadPath")?;
-    let path = &std::path::Path::new(&download_path).join(filename);
+    let path = &Path::new(&download_path).join(filename);
 
     if path.exists() {
         status.description = f!("{book.title} already exists");
@@ -101,6 +107,7 @@ fn start_download(
         Ok(bytes) => {
             status.description = f!("Writing {book.title} to disk");
             status_send.send(status.clone())?;
+            std::fs::create_dir_all(path.parent().unwrap())?;
             std::fs::write(path, bytes)?;
             println!("Wrote {}", path.display());
             status.completed += 1;
@@ -178,6 +185,8 @@ fn load_settings() -> Config {
     config.unwrap_or_default()
 }
 
-fn filename(book: &Book) -> String {
-    f!("{book.year}.{book.title}-{book.authors}.{book.format}")
+fn filename(book: &Book) -> PathBuf {
+    PathBuf::from(&book.authors)
+        .join(&book.title)
+        .with_extension(&book.format)
 }
