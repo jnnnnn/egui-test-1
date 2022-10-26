@@ -217,7 +217,7 @@ fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>, download: &dow
             render_text_cell(&mut row, books[i].format.as_str());
             row.col(|ui| {
                 if ui.button("download").clicked() {
-                    if let Err(_) = download.queue.send(books[i].locator.clone()) {
+                    if let Err(_) = download.queue.send(books[i].hash.clone()) {
                         eprintln!("Failed to send download request");
                     }
                 }
