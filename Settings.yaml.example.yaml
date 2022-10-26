@@ -1,0 +1,6 @@
+downloadPath: # filesystem path to save files
+url_index_base: # index html page will be (http:// library.example /) collection / hash
+url_ipfs_hosts: # hostnames to search for on index page, space-delimited
+
+dbconn: # sqlite index database path on filesystem
+dbsource: # not used. download manually. for example https://github.com/ lib gen apps mirrors.config#L9

@@ -34,7 +34,7 @@ tracing-wasm = "0.2"
 
 
 [profile.release]
-opt-level = 'z' # fast and small wasm
+opt-level = 2 # fast and small wasm
 strip = true  # Automatically strip symbols from the binary.
 
 [patch.crates-io]

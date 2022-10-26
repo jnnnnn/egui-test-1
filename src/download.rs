@@ -65,7 +65,7 @@ fn start_download(
     config: &Config,
 ) -> Result<(), Box<dyn error::Error>> {
     status.description = format!("Downloading {}", book.title);
-    let baseurl = config.get::<String>("url1")?;
+    let baseurl = config.get::<String>("url_index_base")?;
     let collection = match book.collection {
         Collection::Fiction => "fiction",
         Collection::NonFiction => "main",
@@ -92,7 +92,7 @@ fn start_download(
     status_send.send(status.clone())?;
 
     let hosts: Vec<String> = config
-        .get::<String>("hosts")?
+        .get::<String>("url_ipfs_hosts")?
         .split_ascii_whitespace()
         .map(|s| s.to_string())
         .collect();
