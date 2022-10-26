@@ -1,4 +1,4 @@
-use std::sync::atomic::Ordering::Relaxed;
+use std::{cmp::Ordering, sync::atomic::Ordering::Relaxed};
 
 use egui_extras::{Size, TableBuilder};
 
@@ -181,7 +181,11 @@ fn render_filter(ui: &mut egui::Ui, label: &str, text: &mut String) -> bool {
     return result;
 }
 
-fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>, download: &download::Download) {
+fn render_results_table(
+    ui: &mut egui::Ui,
+    books: &mut Vec<db::Book>,
+    download: &download::Download,
+) {
     let mut tb = TableBuilder::new(ui);
     for col in COLUMNS.iter() {
         tb = tb.column(Size::Relative {
@@ -197,7 +201,9 @@ fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>, download: &dow
     tb.header(20.0, |mut header| {
         for col in COLUMNS.iter() {
             header.col(|ui| {
-                ui.label(*col);
+                if ui.button(*col).clicked() {
+                    sort_books(col, books);
+                }
             });
         }
     })
@@ -222,6 +228,20 @@ fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>, download: &dow
                 }
             });
         });
+    });
+}
+
+fn sort_books(col: &&str, books: &mut Vec<db::Book>) {
+    books.sort_by(|a, b| match *col {
+        "Title" => a.title.cmp(&b.title),
+        "Authors" => a.authors.cmp(&b.authors),
+        "Series" => a.series.cmp(&b.series),
+        "Year" => a.year.cmp(&b.year),
+        "Language" => a.language.cmp(&b.language),
+        "Publisher" => a.publisher.cmp(&b.publisher),
+        "FileSize" => a.sizeinbytes.cmp(&b.sizeinbytes),
+        "Format" => a.format.cmp(&b.format),
+        &_ => Ordering::Equal,
     });
 }
 
