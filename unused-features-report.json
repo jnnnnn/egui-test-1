@@ -1,8 +1,8 @@
 {
   "version": 0,
-  "root_name": "jono_egui_test",
+  "root_name": "rlgdesktop",
   "workspace_crates": {
-    "jono_egui_test": {
+    "rlgdesktop": {
       "full_path": "C:\\Users\\J\\Source\\egui-test-1\\Cargo.toml",
       "dependencies": {
         "tokio": {

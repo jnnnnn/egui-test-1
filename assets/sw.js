@@ -1,9 +1,9 @@
-var cacheName = 'jono-cache--pwa';
+var cacheName = 'rlgdesktop-cache--pwa';
 var filesToCache = [
   './',
   './index.html',
-  './jono_egui_test.js',
-  './jono_egui_test_bg.wasm',
+  './rlgdesktop.js',
+  './rlgdesktop_bg.wasm',
 ];
 
 /* Start the service worker and cache all of the app's content */

@@ -1,4 +1,4 @@
-# jono egui test
+# rlgdesktop egui test
 
 The goal is for this to be the simplest way to get started writing a GUI app in Rust.
 

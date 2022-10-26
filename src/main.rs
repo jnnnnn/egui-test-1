@@ -20,7 +20,7 @@ fn main() {
     eframe::run_native(
         "eframe template",
         native_options,
-        Box::new(|cc| Box::new(jono_egui_test::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(rlgdesktop::TemplateApp::new(cc))),
     );
 }
 
@@ -37,7 +37,7 @@ fn main() {
     eframe::start_web(
         "the_canvas_id", // hardcode it
         web_options,
-        Box::new(|cc| Box::new(jono_egui_test::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(rlgdesktop::TemplateApp::new(cc))),
     )
     .expect("failed to start eframe");
 }

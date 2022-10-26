@@ -1238,28 +1238,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8eaf4bc02d17cbdd7ff4c7438cafcdf7fb9a4613313ad11b4f8fefe7d3fa0130"
 
 [[package]]
-name = "jono_egui_test"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "config",
- "console_error_panic_hook",
- "crossbeam",
- "eframe",
- "egui",
- "egui_extras",
- "fstrings",
- "image",
- "regex",
- "reqwest",
- "rusqlite",
- "serde",
- "tokio",
- "tracing-subscriber",
- "tracing-wasm",
-]
-
-[[package]]
 name = "js-sys"
 version = "0.3.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1979,6 +1957,28 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "winreg",
+]
+
+[[package]]
+name = "rlgdesktop"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "config",
+ "console_error_panic_hook",
+ "crossbeam",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "fstrings",
+ "image",
+ "regex",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "tokio",
+ "tracing-subscriber",
+ "tracing-wasm",
 ]
 
 [[package]]
