@@ -38,6 +38,8 @@ pub struct Query {
 }
 
 #[derive(Debug, Default, Clone)]
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(default)]
 pub struct Params {
     pub collection: Collection,
     pub title: String,
@@ -48,6 +50,7 @@ pub struct Params {
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub enum Collection {
     #[default]
     Fiction,

@@ -14,7 +14,6 @@ use crate::{
 #[serde(default)]
 pub struct TemplateApp {
     db_path: String,
-    #[serde(skip)]
     filters: db::Params,
     #[serde(skip)]
     value: f32,
