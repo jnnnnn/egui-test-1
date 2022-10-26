@@ -23,6 +23,8 @@ pub struct TemplateApp {
     #[serde(skip)]
     download: download::Download,
     #[serde(skip)]
+    download_status: download::Status,
+    #[serde(skip)]
     results: Result<Vec<db::Book>, String>,
 }
 
@@ -35,6 +37,7 @@ impl Default for TemplateApp {
             db: None,
             results: Err(String::from("No results")),
             download: download::Download::new(),
+            download_status: download::Status::default(),
         }
     }
 }
@@ -73,6 +76,7 @@ impl eframe::App for TemplateApp {
             db,
             results,
             download,
+            download_status,
         } = self;
 
         if let Some(db) = db {
@@ -135,11 +139,14 @@ impl eframe::App for TemplateApp {
             }
 
             ui.separator();
-            ui.label(format!("{:?}", download.settings));
+            if let Some(status) = download.get_status() {
+                *download_status = status;
+            }
+            ui.label(format!("Downloaded: {:?}", download_status));
         });
 
         egui::CentralPanel::default().show(ctx, |ui| match results {
-            Ok(books) => render_results_table(ui, books),
+            Ok(books) => render_results_table(ui, books, download),
             Err(e) => {
                 ui.label(e.to_string());
                 ()
@@ -175,7 +182,7 @@ fn render_filter(ui: &mut egui::Ui, label: &str, text: &mut String) -> bool {
     return result;
 }
 
-fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
+fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>, download: &download::Download) {
     let mut tb = TableBuilder::new(ui);
     for col in COLUMNS.iter() {
         tb = tb.column(Size::Relative {
@@ -210,7 +217,9 @@ fn render_results_table(ui: &mut egui::Ui, books: &Vec<db::Book>) {
             render_text_cell(&mut row, books[i].format.as_str());
             row.col(|ui| {
                 if ui.button("download").clicked() {
-                    // todo
+                    if let Err(_) = download.queue.send(books[i].locator.clone()) {
+                        eprintln!("Failed to send download request");
+                    }
                 }
             });
         });
