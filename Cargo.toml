@@ -9,19 +9,19 @@ rust-version = "1.64"
 
 
 [dependencies]
-egui = "0.19.0"
-eframe = { version = "0.19.0", features = ["persistence"] }
-serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
+egui = { version = "0.19.0" }
+eframe = { version = "0.19.0", features = ["glow", "persistence"], default-features = false }
+serde = { version = "1", default-features = false } # You only need this if you want app persistence
 egui_extras = "0.19.0"
-rusqlite = { version = "0.28.0", features = ["bundled"] }
-config = "0.13.2"
-crossbeam = { version = "0.8.2", features = ["crossbeam-channel"] }
+rusqlite = { version = "0.28.0", features = ["bundled"], default-features = false }
+config = { version = "0.13.2" }
+crossbeam = { version = "0.8.2", features = ["std"], default-features = false }
 fstrings = "0.2.3"
 reqwest = { version = "0.11.12", features = ["blocking"] }
-regex = "1.6.0"
-tokio = { version = "1.21.2", features = ["full"] }
-bytes = "1.2.1"
-image = "0.24.4"
+regex = { features = ["std"], default-features = false, version = "1.6.0" }
+tokio = { version = "1.21.2", default-features = false }
+bytes = { default-features = false, version = "1.2.1" }
+image = { default-features = false, features = ["png"], version = "0.24.4" }
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -34,8 +34,8 @@ tracing-wasm = "0.2"
 
 
 [profile.release]
-opt-level = 2 # fast and small wasm
-
+opt-level = 'z' # fast and small wasm
+strip = true  # Automatically strip symbols from the binary.
 
 [patch.crates-io]
 
