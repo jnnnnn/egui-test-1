@@ -79,10 +79,12 @@ impl eframe::App for TemplateApp {
         } = self;
 
         if let Some(db) = db {
-            match db.get_result() {
-                Some(Ok(newbooks)) => read_results(results, newbooks, ctx),
-                Some(Err(e)) => *results = Err(e.to_string()),
-                None => {}
+            for _ in 0..100 {
+                match db.get_result() {
+                    Some(Ok(newbooks)) => read_results(results, newbooks, ctx),
+                    Some(Err(e)) => *results = Err(e.to_string()),
+                    None => break,
+                }
             }
         } else if !db_path.is_empty() {
             *db = Some(db::DB::new(db_path));
@@ -233,14 +235,14 @@ fn render_results_table(
 
 fn sort_books(col: &&str, books: &mut Vec<db::Book>) {
     books.sort_by(|a, b| match *col {
-        "Title" => a.title.cmp(&b.title),
-        "Authors" => a.authors.cmp(&b.authors),
-        "Series" => a.series.cmp(&b.series),
+        "Title" => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
+        "Authors" => a.authors.to_lowercase().cmp(&b.authors.to_lowercase()),
+        "Series" => a.series.to_lowercase().cmp(&b.series.to_lowercase()),
         "Year" => a.year.cmp(&b.year),
         "Language" => a.language.cmp(&b.language),
         "Publisher" => a.publisher.cmp(&b.publisher),
         "FileSize" => a.sizeinbytes.cmp(&b.sizeinbytes),
-        "Format" => a.format.cmp(&b.format),
+        "Format" => a.format.to_lowercase().cmp(&b.format.to_lowercase()),
         &_ => Ordering::Equal,
     });
 }
