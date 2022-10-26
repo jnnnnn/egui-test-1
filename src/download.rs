@@ -1,6 +1,9 @@
 use config::Config;
 use crossbeam::channel::{unbounded, Receiver, Sender};
+use fstrings::{f, format_args_f};
 use std::{collections::HashMap, error, thread};
+
+use crate::db::{Book, Collection};
 
 #[derive(Debug, Default, Clone)]
 pub struct Status {
@@ -10,14 +13,13 @@ pub struct Status {
 }
 
 pub struct Download {
-    pub settings: HashMap<String, String>,
-    pub queue: Sender<String>,
+    pub queue: Sender<Book>,
     pub status: Receiver<Status>,
 }
 
 impl Download {
     pub fn new() -> Self {
-        let (queue, recv) = unbounded::<String>();
+        let (queue, recv) = unbounded::<Book>();
         let (status_send, status_recv) = unbounded::<Status>();
         let settings = load_settings();
         let mut status = Status::default();
@@ -25,7 +27,7 @@ impl Download {
         // run downloads off the UI thread
         thread::spawn(move || loop {
             if let Ok(locator) = recv.recv() {
-                if let Err(e) = start_download(&locator, &mut status, &status_send) {
+                if let Err(e) = start_download(&locator, &mut status, &status_send, &settings) {
                     status.description = format!("Error: {}", e);
                     status.errors += 1;
                     if let Err(e) = status_send.send(status.clone()) {
@@ -36,7 +38,6 @@ impl Download {
         });
 
         Self {
-            settings,
             queue,
             status: status_recv,
         }
@@ -48,12 +49,22 @@ impl Download {
 }
 
 fn start_download(
-    locator: &str,
+    book: &Book,
     status: &mut Status,
     status_send: &Sender<Status>,
+    config: &HashMap<String, String>,
 ) -> Result<(), Box<dyn error::Error>> {
-    status.description = format!("Downloading {}", locator);
+    status.description = format!("Downloading {}", book.title);
+    let baseurl = config.get("url1").ok_or("No url1 in config")?;
+    let collection = match book.collection {
+        Collection::Fiction => "fiction",
+        Collection::NonFiction => "main",
+    };
+    let url = f!("{baseurl}/{collection}/{book.hash}");
+    
+
     status.completed += 1;
+    status.description = format!("Completed {}", book.title);
     status_send.send(status.clone())?;
     Ok(())
 }
@@ -69,4 +80,8 @@ fn load_settings() -> HashMap<String, String> {
         .unwrap_or_default()
         .try_deserialize::<HashMap<String, String>>()
         .unwrap_or_default()
+}
+
+fn filename(book: &Book) -> String {
+    f!("{book.year}.{book.title}-{book.authors}.{book.format}")
 }

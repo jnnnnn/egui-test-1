@@ -17,8 +17,9 @@ pub struct DB {
     pub processing: Arc<AtomicBool>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Book {
+    pub collection: Collection,
     pub title: String,
     pub authors: String,
     pub series: String,
@@ -154,7 +155,7 @@ fn start_query(
         ":language": query.params.language,
         ":format": query.params.format,
     ));
-    let mut rows = rows?.mapped(|row| row_to_book(row));
+    let mut rows = rows?.mapped(|row| row_to_book(query, row));
     loop {
         match rows.next() {
             Some(Ok(book)) => response_send.send(Ok(vec![book]))?,
@@ -164,8 +165,9 @@ fn start_query(
     }
 }
 
-fn row_to_book(row: &Row<'_>) -> Result<Book, rusqlite::Error> {
+fn row_to_book(query: &Query, row: &Row<'_>) -> Result<Book, rusqlite::Error> {
     Ok(Book {
+        collection: query.params.collection.clone(),
         title: row.get(0)?,
         authors: row.get(1)?,
         series: row.get(2)?,
