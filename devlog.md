@@ -24,5 +24,5 @@ binary size 11mb. shrink:
  - cargo-bloat shows text 6Mb, no large packages. 
  - https://github.com/johnthagen/min-sized-rust suggests `strip = true ` and `opt-level = "z" `. These save a couple mb. 9mb.
  - unused-features dropped the binary to 5.3MiB but broke it badly. testing the app and added back enough to get it working again. 7.3MiB. 
- - Done.
-
+ - set back to `opt-level = 2`. 9MiB. 
+ - https://kerkour.com/optimize-rust-binary-size suggets `lto = true`.  try with `codegen-units = 1` to start with. very slow build, 3 minutes (including 260 dependencies). 
