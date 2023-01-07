@@ -2,20 +2,26 @@ use std::{
     error,
     sync::{
         atomic::{AtomicBool, Ordering::Relaxed},
-        Arc,
+        Arc, Mutex,
     },
     thread,
 };
 
-use crossbeam::channel::{unbounded, Receiver, Sender};
+use crossbeam::{
+    channel::{unbounded, Receiver, Sender},
+    select,
+};
 use sqlx::{Connection, FromRow, Row, SqliteConnection};
+use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
+
+struct Interrupt {}
 
 pub struct DB {
     query_send: Sender<Query>,
     response_receive: Receiver<Result<Vec<Book>, String>>,
+    interrupt_send: Sender<Interrupt>,
     pub processing: Arc<AtomicBool>,
-    pub interrupt: Arc<AtomicBool>,
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +92,7 @@ impl DB {
     pub fn new(conn: &str) -> Self {
         let (query_send, query_receive) = unbounded::<Query>();
         let (response_send, response_receive) = unbounded::<Result<Vec<Book>, String>>();
+        let (interrupt_send, interrupt_receive) = unbounded::<Interrupt>();
         let conn = conn.to_owned();
 
         let processing = Arc::new(AtomicBool::new(false));
@@ -101,20 +108,20 @@ impl DB {
                 .build()
                 .unwrap();
 
-            runtime.block_on(run_db_thread(
+            runtime.block_on(start_connection(
                 conn,
                 query_receive,
                 response_send,
+                interrupt_receive,
                 processing_clone,
-                interrupt_clone,
             ));
         });
 
         Self {
             query_send,
             response_receive,
+            interrupt_send,
             processing,
-            interrupt,
         }
     }
 
@@ -137,34 +144,78 @@ impl DB {
     // stop the currently executing query.
     // It is also a good idea to drain the receive queue
     // (keep calling get_result until nothing is left).
-    pub fn interrupt(&self) {}
+    pub fn interrupt(&self) {
+        if let Err(e) = self.interrupt_send.send(Interrupt {}) {
+            eprintln!("Error sending interrupt: {}", e);
+        }
+    }
 }
 
-async fn run_db_thread(
+async fn start_connection(
     conn: String,
     query_receive: Receiver<Query>,
     response_send: Sender<Result<Vec<Book>, String>>,
+    interrupt_receive: Receiver<Interrupt>,
     processing: Arc<AtomicBool>,
-    interrupt: Arc<AtomicBool>,
 ) {
     // a mutable connection
     let connection = SqliteConnection::connect(&conn).await;
     match connection {
         Ok(mut connection) => loop {
-            if let Ok(query) = query_receive.recv() {
-                processing.store(true, Relaxed);
-                if let Err(e) =
-                    start_query(&mut connection, &query, &response_send, &interrupt).await
-                {
-                    if let Err(e) = response_send.send(Err(e.to_string())) {
-                        eprintln!("Error sending error: {}", e);
-                    }
-                }
-                processing.store(false, Relaxed);
-            }
+            listen(
+                &mut connection,
+                &query_receive,
+                &response_send,
+                &interrupt_receive,
+                &processing,
+            );
         },
         Err(e) => {
             eprintln!("Error opening database: {}", e);
+        }
+    }
+}
+
+async fn listen(
+    connection: &mut SqliteConnection,
+    query_receive: &Receiver<Query>,
+    response_send: &Sender<Result<Vec<Book>, String>>,
+    interrupt_receive: &Receiver<Interrupt>,
+    processing: &Arc<AtomicBool>,
+) {
+    // a handle to the current query
+    let join_handle: Arc<Mutex<Option<JoinHandle<()>>>> = Arc::new(Mutex::new(None));
+    // wait for a query or an interrupt
+    crossbeam::select! {
+        recv(query_receive) -> query => {
+            match query {
+                Ok(query) => {
+                    // start a new query
+                    let task_handle = Some(tokio::spawn(async move {
+                        start_query(connection, &query, &response_send, &processing).await;
+                    }));
+                    // store the handle so we can interrupt it
+                    *join_handle.lock().unwrap() = task_handle;
+                },
+                Err(e) => {
+                    eprintln!("Error receiving query: {}", e);
+                }
+            }
+        },
+        recv(interrupt_receive) -> interrupt => {
+            match interrupt {
+                Ok(_) => {
+                    // interrupt the current query
+                    processing.store(false, Relaxed);
+                    // wait for the query to finish
+                    if let Some(join_handle) = join_handle.lock().unwrap().take() {
+                        join_handle.await.unwrap();
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Error receiving interrupt: {}", e);
+                }
+            }
         }
     }
 }
@@ -173,8 +224,9 @@ async fn start_query(
     connection: &mut SqliteConnection,
     query: &Query,
     response_send: &Sender<Result<Vec<Book>, String>>,
-    interrupt: &Arc<AtomicBool>,
+    processing: &Arc<AtomicBool>,
 ) -> Result<(), Box<dyn error::Error>> {
+    processing.store(true, Relaxed);
     let collection = match query.params.collection {
         Collection::Fiction => "Fiction",
         Collection::NonFiction => "NonFiction",
@@ -201,9 +253,6 @@ async fn start_query(
     let mut rows = prep.fetch(connection);
     let mut books = Vec::new();
     while let Some(row) = rows.try_next().await? {
-        if interrupt.load(Relaxed) {
-            break;
-        }
         let book = Book::from_row(&row)?;
         books.push(book);
         if books.len() == 100 {
@@ -218,6 +267,8 @@ async fn start_query(
             eprintln!("Error sending books: {}", e);
         }
     }
+
+    processing.store(false, Relaxed);
 
     Ok(())
 }
