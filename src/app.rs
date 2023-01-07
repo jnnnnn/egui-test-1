@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, sync::atomic::Ordering::Relaxed};
 
-use egui_extras::{Size, TableBuilder};
+use egui_extras::{Column, TableBuilder};
 
 use crate::{
     db::{
@@ -189,7 +189,10 @@ fn render_results_table(
     download: &download::Download,
 ) {
     let mut tb = TableBuilder::new(ui);
-    for col in COLUMNS.iter() {
+    for _col in COLUMNS.iter() {
+        // relatively-sized columns, with Title larger than the others
+        tb = tb.column(Column::auto())
+        /*
         tb = tb.column(Size::Relative {
             fraction: match *col {
                 "Title" => 0.35,
@@ -199,6 +202,7 @@ fn render_results_table(
             },
             range: (30.0, 3000.0),
         });
+        */
     }
     tb.header(20.0, |mut header| {
         for col in COLUMNS.iter() {
