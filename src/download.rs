@@ -158,6 +158,8 @@ async fn download_file(content: String, host: String) -> Result<Bytes, Box<dyn e
     let captures = re.captures(&content).ok_or("No link found")?;
     let url = captures.get(1).ok_or("No link found")?.as_str();
 
+    println_f!("Downloading {}", url);
+
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()?;

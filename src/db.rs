@@ -108,15 +108,15 @@ impl DB {
         // https://www.sqlite.org/fts5.html
         // search the fiction_fts table for query
         let stmt = format!("
-        SELECT f.title, f.authors, f.series, f.year, f.language, f.publisher, f.sizeinbytes, f.format, f.md5hash 
+        SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, f.md5 as md5hash
         FROM {} f
         WHERE 
             f.title LIKE '%'||:title||'%' AND 
-            f.authors LIKE '%'||:authors||'%' AND
+            f.author LIKE '%'||:authors||'%' AND
             f.series LIKE '%'||:series||'%' AND
             f.language LIKE '%'||:language||'%' AND
-            f.format LIKE '%'||:format||'%'
-        ORDER BY f.authors, f.title, f.sizeinbytes
+            f.extension LIKE '%'||:format||'%'
+        ORDER BY f.author, f.title, f.filesize
         ", match params.collection {
             Collection::NonFiction => "non_fiction",
             _ => "fiction",

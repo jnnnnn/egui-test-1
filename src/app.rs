@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, sync::atomic::Ordering::Relaxed};
+use std::{cmp::Ordering, ops::RangeInclusive, sync::atomic::Ordering::Relaxed};
 
 use egui_extras::{Column, TableBuilder};
 
@@ -191,7 +191,12 @@ fn render_results_table(
     let mut tb = TableBuilder::new(ui);
     for _col in COLUMNS.iter() {
         // relatively-sized columns, with Title larger than the others
-        tb = tb.column(Column::auto())
+        tb = tb.column(
+            Column::auto()
+                .range(RangeInclusive::new(30.0, 3000.0))
+                .resizable(true)
+                .clip(true),
+        );
         /*
         tb = tb.column(Size::Relative {
             fraction: match *col {
