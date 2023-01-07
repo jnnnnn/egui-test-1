@@ -40,5 +40,9 @@ Ah, here's what worked:
 
 Tables have changed. Easier to fix with sqlx. [Convert](https://github.com/launchbadge/sqlx#usage).
 
-Can't figure out how to abort queries in sqlx.
+Can't figure out how to abort queries in sqlx. 
+
+Revert back to rusqlite. At least that is straightforward to abort things, without having to have a huge pile of tokio complexity.
+
+
 
