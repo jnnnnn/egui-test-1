@@ -40,3 +40,5 @@ Ah, here's what worked:
 
 Tables have changed. Easier to fix with sqlx. [Convert](https://github.com/launchbadge/sqlx#usage).
 
+Can't figure out how to abort queries in sqlx.
+
