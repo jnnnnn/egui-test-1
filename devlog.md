@@ -26,3 +26,17 @@ binary size 11mb. shrink:
  - unused-features dropped the binary to 5.3MiB but broke it badly. testing the app and added back enough to get it working again. 7.3MiB. 
  - set back to `opt-level = 2`. 9MiB. 
  - https://kerkour.com/optimize-rust-binary-size suggets `lto = true`.  try with `codegen-units = 1` to start with. very slow build, 3 minutes (including 260 dependencies). 
+
+## 2023-01-07
+
+Can't figure out how to restore a DB.
+
+Ah, here's what worked:
+
+1. download the latest rar dump
+2. extract the (mysql-formatted) dump from the rar
+3. convert it to sqlite with mysql2sqlite: `mysql2sqlite dump.sql > dump2.sql`
+4. restore it using `sqlite3 db.sqlite < dump2.sql`
+
+Tables have changed. Easier to fix with sqlx. [Convert](https://github.com/launchbadge/sqlx#usage).
+

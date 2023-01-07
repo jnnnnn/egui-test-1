@@ -15,6 +15,7 @@ The official egui docs are at <https://docs.rs/egui>. If you prefer watching a v
 Make sure you are using the latest version of stable rust by running `rustup update`. To start a local instance, run:
 
 ```sh
+cargo install cargo-watch
 cargo watch -x run  
 ```
 
