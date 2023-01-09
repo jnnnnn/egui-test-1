@@ -28,7 +28,7 @@ pub struct Book {
     pub publisher: String,
     pub sizeinbytes: i64,
     pub format: String,
-    pub hash: String,
+    pub cid: String,
 }
 
 #[derive(Debug)]
@@ -108,8 +108,9 @@ impl DB {
         // https://www.sqlite.org/fts5.html
         // search the fiction_fts table for query
         let stmt = format!("
-        SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, f.md5 as md5hash
-        FROM {} f
+        SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, h.ipfs_cid as cid
+        FROM {0} f
+        join {0}_hashes on f.md5 = {0}_hashes.md5 as h
         WHERE 
             f.title LIKE '%'||:title||'%' AND 
             f.author LIKE '%'||:authors||'%' AND
@@ -179,6 +180,6 @@ fn row_to_book(query: &Query, row: &Row<'_>) -> Result<Book, rusqlite::Error> {
         publisher: row.get(5)?,
         sizeinbytes: row.get(6)?,
         format: row.get(7)?,
-        hash: row.get(8)?,
+        cid: row.get(8)?,
     })
 }

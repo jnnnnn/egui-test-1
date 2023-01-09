@@ -91,18 +91,14 @@ fn start_download(
     status.description = f!("Retrieved index page for {book.title}");
     status_send.send(status.clone())?;
 
-    let hosts: Vec<String> = config
-        .get::<String>("url_ipfs_hosts")?
-        .split_ascii_whitespace()
-        .map(|s| s.to_string())
-        .collect();
+    let urls = parse_urls(&content)?;
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    let maybe_bytes = runtime.block_on(download_race(hosts, content));
+    let maybe_bytes = runtime.block_on(download_race(urls));
     match maybe_bytes {
         Ok(bytes) => {
             status.description = f!("Writing {book.title} to disk");
@@ -123,20 +119,33 @@ fn start_download(
     Ok(())
 }
 
-async fn download_race(hosts: Vec<String>, content: String) -> Result<Bytes, String> {
+fn parse_urls(content: &str) -> Result<Vec<String>, regex::Error> {
+    let pattern = f!("https://[^\"]+/ipfs/[^\"]+");
+    let re = regex::Regex::new(&pattern)?;
+
+    let urls = re
+        .find_iter(&content)
+        .map(|m| m.as_str().to_string())
+        .collect::<Vec<_>>();
+
+    if urls.is_empty() {
+        return Err(regex::Error::Syntax("No ipfs urls found".to_string()));
+    } else {
+        return Ok(urls);
+    }
+}
+
+async fn download_race(urls: Vec<String>) -> Result<Bytes, String> {
     // start a download for each host
     let mut set = JoinSet::<Result<Bytes, String>>::new();
 
-    for (i, host) in hosts.iter().enumerate() {
-        let content = content.clone();
-        let host = host.clone();
+    for (i, url) in urls.iter().enumerate() {
+        let url = url.clone();
         set.spawn(async move {
             // give each endpoint an extra ten seconds to start
             let delay = Duration::from_secs(10 * i as u64);
             tokio::time::sleep(delay).await;
-            download_file(content, host)
-                .await
-                .map_err(|e| e.to_string())
+            download_file(&url).await.map_err(|e| e.to_string())
         });
     }
     while let Some(result) = set.join_next().await {
@@ -152,12 +161,7 @@ async fn download_race(hosts: Vec<String>, content: String) -> Result<Bytes, Str
     Err("No downloads succeeded".to_string())
 }
 
-async fn download_file(content: String, host: String) -> Result<Bytes, Box<dyn error::Error>> {
-    let pattern = f!("\"(https://{host}/ipfs/[^\"]+)");
-    let re = regex::Regex::new(&pattern)?;
-    let captures = re.captures(&content).ok_or("No link found")?;
-    let url = captures.get(1).ok_or("No link found")?.as_str();
-
+async fn download_file(url: &String) -> Result<Bytes, Box<dyn error::Error>> {
     println_f!("Downloading {}", url);
 
     let client = reqwest::Client::builder()
@@ -195,4 +199,20 @@ fn filename(book: &Book) -> PathBuf {
     PathBuf::from(&book.authors)
         .join(&book.title)
         .with_extension(&book.format)
+}
+
+// write a test for regex matching of urls in content
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_url_match() {
+        let content = r#"
+        <a href="https://host1.io/ipfs/123 space"</a>
+        <a href="https://host2.io/ipfs/ABC DEF"</a>
+        "#;
+        let urls = parse_urls(content).unwrap();
+        assert_eq!(urls[0], "https://host1.io/ipfs/123 space");
+    }
 }
