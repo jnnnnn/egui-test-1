@@ -71,3 +71,8 @@ without having to have a huge pile of tokio complexity.
 | Anthony, Piers   | 2744    | And Eternity, Bearing an Hourglass, Heaven Cent                               |
 | Resnick, Mike    | 2088    | Prophet, Kirinyaga, Oracle                                                    |
 | Grant, Maxwell   | 2009    | Terror Island, Alibi Trail                                                    |
+
+
+## 2023-01-09
+
+Asked about cancelling async sqlx. You can't actually terminate the query in the engine but [you can ignore the result](https://stackoverflow.com/questions/75039196/how-to-cancel-a-long-running-query-when-using-rust-sqlx-tokio/75043208#75043208) when the async returns back to your code. I'll leave it as is for now.
