@@ -10,7 +10,7 @@ use std::{
 };
 use tokio::task::JoinSet;
 
-use crate::db::{Book, Collection};
+use crate::db::{Book};
 
 #[derive(Debug, Default, Clone)]
 pub struct Status {
@@ -65,23 +65,7 @@ fn start_download(
     config: &Config,
 ) -> Result<(), Box<dyn error::Error>> {
     status.description = format!("Downloading {}", book.title);
-    let baseurl = config.get::<String>("url_index_base")?;
-    let collection = match book.collection {
-        Collection::Fiction => "fiction",
-        Collection::NonFiction => "main",
-    };
-
-    let url_ipfs_hosts = config.get::<Vec<String>>("url_ipfs_hosts")?;
     
-    // work out the url. "(series) author title.format" but leave out series if blank
-    let series = if book.series.is_empty() {
-        f!("")
-    } else {
-        f!("({book.series})")
-    };
-    let target = f!("{book.hash}?filename={series}{book.authors} {book.title}.{book.format}");
-    let url = f!("{baseurl}/{collection}/{target}");
-
     let filename = filename(book);
     let download_path = config.get::<String>("downloadPath")?;
     let path = &Path::new(&download_path).join(filename);
@@ -93,22 +77,18 @@ fn start_download(
         return Ok(());
     }
 
-    let response = reqwest::blocking::get(&url)?;
-    if !response.status().is_success() {
-        return Err(format!("Error downloading {}: {}", book.title, response.status()).into());
-    }
-    let content = response.text()?;
-    status.description = f!("Retrieved index page for {book.title}");
-    status_send.send(status.clone())?;
-
-    let urls = parse_urls(&content)?;
+    let hosts: Vec<String> = config
+        .get::<String>("url_ipfs_hosts")?
+        .split_ascii_whitespace()
+        .map(|s| s.to_string())
+        .collect();
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    let maybe_bytes = runtime.block_on(download_race(urls));
+    let maybe_bytes = runtime.block_on(download_race(hosts, book));
     match maybe_bytes {
         Ok(bytes) => {
             status.description = f!("Writing {book.title} to disk");
@@ -129,33 +109,18 @@ fn start_download(
     Ok(())
 }
 
-fn parse_urls(content: &str) -> Result<Vec<String>, regex::Error> {
-    let pattern = f!("https://[^\"]+/ipfs/[^\"]+");
-    let re = regex::Regex::new(&pattern)?;
-
-    let urls = re
-        .find_iter(&content)
-        .map(|m| m.as_str().to_string())
-        .collect::<Vec<_>>();
-
-    if urls.is_empty() {
-        return Err(regex::Error::Syntax("No ipfs urls found".to_string()));
-    } else {
-        return Ok(urls);
-    }
-}
-
-async fn download_race(urls: Vec<String>) -> Result<Bytes, String> {
+async fn download_race(hosts: Vec<String>, book: &Book) -> Result<Bytes, String> {
     // start a download for each host
     let mut set = JoinSet::<Result<Bytes, String>>::new();
 
-    for (i, url) in urls.iter().enumerate() {
-        let url = url.clone();
+    for (i, host) in hosts.iter().enumerate() {
+        let host = host.clone();
+        let book = book.clone();
         set.spawn(async move {
             // give each endpoint an extra ten seconds to start
             let delay = Duration::from_secs(10 * i as u64);
             tokio::time::sleep(delay).await;
-            download_file(&url).await.map_err(|e| e.to_string())
+            download_file(&host, &book).await.map_err(|e| e.to_string())
         });
     }
     while let Some(result) = set.join_next().await {
@@ -171,14 +136,19 @@ async fn download_race(urls: Vec<String>) -> Result<Bytes, String> {
     Err("No downloads succeeded".to_string())
 }
 
-async fn download_file(url: &String) -> Result<Bytes, Box<dyn error::Error>> {
-    println_f!("Downloading {}", url);
-
+async fn download_file(host: &String, book: &Book) -> Result<Bytes, Box<dyn error::Error>> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()?;
+    let series = if book.series.is_empty() {
+        f!("")
+    } else {
+        f!("({book.series}) ")
+    };
+    let filename = f!("{series}{book.authors} - {book.title}.{book.format}");
+    let url = f!("https://{host}/ipfs/{book.ipfs_cid}?filename={filename}");
 
-    let response = client.get(url).send().await?;
+    let response = client.get(&url).send().await?;
     if !response.status().is_success() {
         return Err(format!("Error downloading {}: {}", url, response.status()).into());
     }
@@ -209,20 +179,4 @@ fn filename(book: &Book) -> PathBuf {
     PathBuf::from(&book.authors)
         .join(&book.title)
         .with_extension(&book.format)
-}
-
-// write a test for regex matching of urls in content
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_url_match() {
-        let content = r#"
-        <a href="https://host1.io/ipfs/123 space"</a>
-        <a href="https://host2.io/ipfs/ABC DEF"</a>
-        "#;
-        let urls = parse_urls(content).unwrap();
-        assert_eq!(urls[0], "https://host1.io/ipfs/123 space");
-    }
 }
