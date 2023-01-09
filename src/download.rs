@@ -70,7 +70,17 @@ fn start_download(
         Collection::Fiction => "fiction",
         Collection::NonFiction => "main",
     };
-    let url = f!("{baseurl}/{collection}/{book.hash}");
+
+    let url_ipfs_hosts = config.get::<Vec<String>>("url_ipfs_hosts")?;
+    
+    // work out the url. "(series) author title.format" but leave out series if blank
+    let series = if book.series.is_empty() {
+        f!("")
+    } else {
+        f!("({book.series})")
+    };
+    let target = f!("{book.hash}?filename={series}{book.authors} {book.title}.{book.format}");
+    let url = f!("{baseurl}/{collection}/{target}");
 
     let filename = filename(book);
     let download_path = config.get::<String>("downloadPath")?;

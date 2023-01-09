@@ -108,9 +108,9 @@ impl DB {
         // https://www.sqlite.org/fts5.html
         // search the fiction_fts table for query
         let stmt = format!("
-        SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, h.ipfs_cid as cid
+        SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, fh.ipfs_cid as hash
         FROM {0} f
-        join {0}_hashes on f.md5 = {0}_hashes.md5 as h
+        join {0}_hashes on LOWER(f.md5) = {0}_hashes.md5 as fh
         WHERE 
             f.title LIKE '%'||:title||'%' AND 
             f.author LIKE '%'||:authors||'%' AND
