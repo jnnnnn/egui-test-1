@@ -189,25 +189,18 @@ fn render_results_table(
     download: &download::Download,
 ) {
     let mut tb = TableBuilder::new(ui);
-    for _col in COLUMNS.iter() {
-        // relatively-sized columns, with Title larger than the others
+    for col in COLUMNS.iter() {
+        let minwidth = match *col {
+            "Title" => 200.0,
+            "Authors" | "Series" | "Publisher" => 100.0,
+            _ => 50.0,
+        };
         tb = tb.column(
             Column::auto()
-                .range(RangeInclusive::new(30.0, 3000.0))
+                .range(RangeInclusive::new(minwidth, 3000.0))
                 .resizable(true)
                 .clip(true),
-        );
-        /*
-        tb = tb.column(Size::Relative {
-            fraction: match *col {
-                "Title" => 0.35,
-                "Authors" | "Series" => 0.15,
-                "Download" => 0.1,
-                "Year" | "Language" | "FileSize" | "Format" | "Publisher" | &_ => 0.05,
-            },
-            range: (30.0, 3000.0),
-        });
-        */
+        );        
     }
     tb.header(20.0, |mut header| {
         for col in COLUMNS.iter() {
@@ -219,7 +212,7 @@ fn render_results_table(
         }
     })
     .body(|body| {
-        body.rows(30.0, books.len(), |i, mut row| {
+        body.rows(20.0, books.len(), |i, mut row| {
             render_text_cell(&mut row, books[i].title.as_str());
             render_text_cell(&mut row, books[i].authors.as_str());
             render_text_cell(&mut row, books[i].series.as_str());
