@@ -1,2 +1,2 @@
-downloadPath: # filesystem path to save files
-url_index_base: # index html page will be (http:// library.example /) collection / hash
+downloadPath: "c:\\users\\adam\\books"
+url_ipfs_hosts: cloudflare-ipfs.com ipfs.io gateway.pinata.cloud crustwebsites.net

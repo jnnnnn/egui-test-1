@@ -76,3 +76,7 @@ without having to have a huge pile of tokio complexity.
 ## 2023-01-09
 
 Asked about cancelling async sqlx. You can't actually terminate the query in the engine but [you can ignore the result](https://stackoverflow.com/questions/75039196/how-to-cancel-a-long-running-query-when-using-rust-sqlx-tokio/75043208#75043208) when the async returns back to your code. I'll leave it as is for now.
+
+## 2023-01-10
+
+go straight to ipfs, without going through online index. This is a lot faster but requires the hashes from the db dump. Not sure how to show ISBN, can't see it in any of the tables.
