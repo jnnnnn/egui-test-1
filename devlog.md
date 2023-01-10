@@ -80,3 +80,9 @@ Asked about cancelling async sqlx. You can't actually terminate the query in the
 ## 2023-01-10
 
 go straight to ipfs, without going through online index. This is a lot faster but requires the hashes from the db dump. Not sure how to show ISBN, can't see it in any of the tables.
+
+Built a release:
+
+```sh
+cargo build --release
+```

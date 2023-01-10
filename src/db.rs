@@ -66,6 +66,16 @@ impl DB {
 
         let processing = Arc::new(AtomicBool::new(false));
 
+        // check that file exists
+        if !std::path::Path::new(&conn).exists() {
+            return Self {
+                query_send,
+                response_receive,
+                interrupt: None,
+                processing,
+            };
+        }
+
         let connection = rusqlite::Connection::open(&conn);
         if let Err(e) = connection {
             eprintln!("Error opening database: {}", e);
