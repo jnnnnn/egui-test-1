@@ -46,15 +46,16 @@ impl Default for TemplateApp {
 }
 
 const COLUMNS: &'static [&'static str] = &[
+    "Download",
     "Title",
     "Authors",
     "Series",
     "Year",
     "Language",
     "Publisher",
+    "Duplicates",
     "FileSize",
     "Format",
-    "Download",
 ];
 
 impl TemplateApp {
@@ -84,7 +85,7 @@ impl eframe::App for TemplateApp {
         } = self;
 
         if let Some(db) = db {
-            for _ in 0..100 {
+            for _ in 0..10000 {
                 match db.get_result() {
                     Some(Ok(newbooks)) => {
                         read_results(results, newbooks, uifilter, filters.deduplicate, ctx)
@@ -175,9 +176,9 @@ fn read_results(
 ) {
     if let Ok(bookcache) = results {
         while newbooks.len() > 0 {
-            let newbook = newbooks.pop().unwrap();
+            let mut newbook = newbooks.pop().unwrap();
             if deduplicate {
-                filter_update_booklist(uifilter, bookcache, &newbook);
+                filter_update_booklist(uifilter, bookcache, &mut newbook);
             } else {
                 bookcache.push(newbook);
             }
@@ -210,7 +211,7 @@ fn render_results_table(
         let minwidth = match *col {
             "Title" => 200.0,
             "Authors" | "Series" | "Publisher" => 100.0,
-            _ => 50.0,
+            _ => 80.0,
         };
         tb = tb.column(
             Column::auto()
@@ -230,17 +231,6 @@ fn render_results_table(
     })
     .body(|body| {
         body.rows(20.0, books.len(), |i, mut row| {
-            render_text_cell(&mut row, books[i].title.as_str());
-            render_text_cell(&mut row, books[i].authors.as_str());
-            render_text_cell(&mut row, books[i].series.as_str());
-            render_text_cell(&mut row, books[i].year.as_str());
-            render_text_cell(&mut row, books[i].language.as_str());
-            render_text_cell(&mut row, books[i].publisher.as_str());
-            render_text_cell(
-                &mut row,
-                format!("{:.0}", books[i].sizeinbytes as f32 / 1024.0).as_str(),
-            );
-            render_text_cell(&mut row, books[i].format.as_str());
             row.col(|ui| {
                 if ui.button("download").clicked() {
                     if let Err(_) = download.queue.send(books[i].clone()) {
@@ -248,6 +238,18 @@ fn render_results_table(
                     }
                 }
             });
+            render_text_cell(&mut row, books[i].title.as_str());
+            render_text_cell(&mut row, books[i].authors.as_str());
+            render_text_cell(&mut row, books[i].series.as_str());
+            render_text_cell(&mut row, books[i].year.as_str());
+            render_text_cell(&mut row, books[i].language.as_str());
+            render_text_cell(&mut row, books[i].publisher.as_str());
+            render_text_cell(&mut row, books[i].duplicates.to_string().as_str());
+            render_text_cell(
+                &mut row,
+                format!("{:.0}", books[i].sizeinbytes as f32 / 1024.0).as_str(),
+            );
+            render_text_cell(&mut row, books[i].format.as_str());
         });
     });
 }
@@ -260,6 +262,7 @@ fn sort_books(col: &&str, books: &mut Vec<db::Book>) {
         "Year" => a.year.cmp(&b.year),
         "Language" => a.language.cmp(&b.language),
         "Publisher" => a.publisher.cmp(&b.publisher),
+        "Duplicates" => b.duplicates.cmp(&a.duplicates),
         "FileSize" => a.sizeinbytes.cmp(&b.sizeinbytes),
         "Format" => a.format.to_lowercase().cmp(&b.format.to_lowercase()),
         &_ => Ordering::Equal,

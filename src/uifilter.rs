@@ -1,4 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{
+    btree_map::Entry::{Occupied, Vacant},
+    BTreeMap,
+};
 
 use crate::db::Book;
 
@@ -10,7 +13,7 @@ pub struct UIFilter {
     seen: BTreeMap<Key, BookRef>,
 }
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Hash, Clone)]
 struct Key {
     title: String,
     authors: String,
@@ -19,57 +22,73 @@ struct Key {
 struct BookRef {
     book: Book,
     current_index: usize,
+    count: usize,
+}
+
+fn clean_title(title: &str) -> String {
+    title
+        .split(|c: char| c.is_ascii_punctuation())
+        .next()
+        .unwrap()
+        .to_string()
 }
 
 pub fn filter_update_booklist(f: &mut UIFilter, books: &mut Vec<Book>, newbook: &Book) {
     let seen = &mut f.seen;
     let key = Key {
         // strip title of everything after the first non-alphanumeric character
-        title: newbook
-            .title
-            .split(|c: char| !c.is_alphanumeric())
-            .next()
-            .unwrap()
-            .to_string(),
+        title: clean_title(&newbook.title),
         // strip authors of everything after the first space
         authors: newbook.authors.split(' ').next().unwrap().to_string(),
     };
 
-    let new_index: usize = match seen.get(&key) {
-        Some(bookref) => {
+    let (new_index, new_count) = match seen.entry(key.clone()) {
+        Occupied(bookref) => {
+            let bookref = bookref.into_mut();
+            bookref.count += 1;
             if compare(&bookref.book, newbook) {
                 // the new book is better than the old one, replace it
-                bookref.current_index
+                (bookref.current_index, bookref.count + 1)
             } else {
                 // there's a better one already in the list, ignore this one
+                books[bookref.current_index].duplicates = bookref.count;
                 return;
             }
         }
-        None => books.len(),
+        Vacant(_entry) => (books.len(), 1),
     };
 
-    if new_index == books.len() {
-        books.push(newbook.clone());
-    } else {
-        books[new_index] = newbook.clone();
+    {
+        let mut newbook = newbook.clone();
+        newbook.duplicates = new_count;
+        if new_index == books.len() {
+            books.push(newbook);
+        } else {
+            books[new_index] = newbook;
+        }
     }
-
     seen.insert(
         key,
         BookRef {
             book: newbook.clone(),
             current_index: new_index,
+            count: new_count,
         },
     );
 }
 
 // return true to replace old with new
 fn compare(old: &Book, new: &Book) -> bool {
+    assert_eq!(
+        clean_title(&old.title),
+        clean_title(&new.title)
+    );
+
     // if the new book is more than ten times larger, skip it
     if new.sizeinbytes > old.sizeinbytes * 10 {
         return false;
     }
-    
+
     // if either publisher starts with "Acrobat", choose the other
     if old.publisher.starts_with("Acrobat") != new.publisher.starts_with("Acrobat") {
         return old.publisher.starts_with("Acrobat");
@@ -110,6 +129,7 @@ mod tests {
         language: "en".to_string(),
         format: "epub".to_string(),
         ipfs_cid: "Qm123".to_string(),
+        duplicates: 1,
     });
 
     // keep the one with a publisher, even if the year is newer
@@ -128,5 +148,4 @@ mod tests {
         assert!(compare(&old, &new));
         assert!(!compare(&new, &old));
     }
-
 }

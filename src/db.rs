@@ -29,6 +29,7 @@ pub struct Book {
     pub sizeinbytes: i64,
     pub format: String,
     pub ipfs_cid: String,
+    pub duplicates: usize,
 }
 
 #[derive(Debug)]
@@ -192,5 +193,6 @@ fn row_to_book(query: &Query, row: &Row<'_>) -> Result<Book, rusqlite::Error> {
         sizeinbytes: row.get(6)?,
         format: row.get(7)?,
         ipfs_cid: row.get(8)?,
+        duplicates: 1
     })
 }
