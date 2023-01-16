@@ -8,6 +8,7 @@ use crate::{
         Collection::{Fiction, NonFiction},
     },
     download,
+    uifilter::{filter_update_booklist, UIFilter},
 };
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -25,6 +26,8 @@ pub struct TemplateApp {
     download_status: download::Status,
     #[serde(skip)]
     results: Result<Vec<db::Book>, String>,
+    #[serde(skip)]
+    uifilter: UIFilter,
 }
 
 impl Default for TemplateApp {
@@ -37,6 +40,7 @@ impl Default for TemplateApp {
             results: Err(String::from("No results")),
             download: download::Download::new(),
             download_status: download::Status::default(),
+            uifilter: UIFilter::default(),
         }
     }
 }
@@ -74,6 +78,7 @@ impl eframe::App for TemplateApp {
             filters,
             db,
             results,
+            uifilter,
             download,
             download_status,
         } = self;
@@ -81,7 +86,9 @@ impl eframe::App for TemplateApp {
         if let Some(db) = db {
             for _ in 0..100 {
                 match db.get_result() {
-                    Some(Ok(newbooks)) => read_results(results, newbooks, ctx),
+                    Some(Ok(newbooks)) => {
+                        read_results(results, newbooks, uifilter, filters.deduplicate, ctx)
+                    }
                     Some(Err(e)) => *results = Err(e.to_string()),
                     None => break,
                 }
@@ -111,6 +118,8 @@ impl eframe::App for TemplateApp {
                 changed = false;
             }
 
+            ui.checkbox(&mut filters.deduplicate, "Remove duplicates");
+
             changed |= render_filter(ui, "Title", &mut filters.title);
             changed |= render_filter(ui, "Authors", &mut filters.authors);
             changed |= render_filter(ui, "Series", &mut filters.series);
@@ -123,6 +132,7 @@ impl eframe::App for TemplateApp {
                     while db.get_result().is_some() {}
                     db.query(filters.clone());
                     *results = Err(String::from("Searching..."));
+                    *uifilter = UIFilter::default();
                 }
             }
 
@@ -159,11 +169,18 @@ impl eframe::App for TemplateApp {
 fn read_results(
     results: &mut Result<Vec<db::Book>, String>,
     mut newbooks: Vec<db::Book>,
+    uifilter: &mut UIFilter,
+    deduplicate: bool,
     ctx: &egui::Context,
 ) {
     if let Ok(bookcache) = results {
         while newbooks.len() > 0 {
-            bookcache.push(newbooks.pop().unwrap());
+            let newbook = newbooks.pop().unwrap();
+            if deduplicate {
+                filter_update_booklist(uifilter, bookcache, &newbook);
+            } else {
+                bookcache.push(newbook);
+            }
             // keep redrawing while results are available even if mouse is not moving
             ctx.request_repaint();
         }
@@ -200,7 +217,7 @@ fn render_results_table(
                 .range(RangeInclusive::new(minwidth, 3000.0))
                 .resizable(true)
                 .clip(true),
-        );        
+        );
     }
     tb.header(20.0, |mut header| {
         for col in COLUMNS.iter() {
@@ -239,7 +256,7 @@ fn sort_books(col: &&str, books: &mut Vec<db::Book>) {
     books.sort_by(|a, b| match *col {
         "Title" => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
         "Authors" => a.authors.to_lowercase().cmp(&b.authors.to_lowercase()),
-        "Series" => a.series.to_lowercase().cmp(&b.series.to_lowercase()),
+        "Series" => compare_series(a.series.as_str(), b.series.as_str()),
         "Year" => a.year.cmp(&b.year),
         "Language" => a.language.cmp(&b.language),
         "Publisher" => a.publisher.cmp(&b.publisher),
@@ -253,4 +270,19 @@ fn render_text_cell(row: &mut egui_extras::TableRow<'_, '_>, text: &str) {
     row.col(|ui| {
         ui.label(text);
     });
+}
+
+// parse out the number at the end of the series name
+fn compare_series(a: &str, b: &str) -> Ordering {
+    let a = a.trim();
+    let b = b.trim();
+    let a = a.split_whitespace().last();
+    let b = b.split_whitespace().last();
+    match (a, b) {
+        (Some(a), Some(b)) => match (a.parse::<i32>(), b.parse::<i32>()) {
+            (Ok(a), Ok(b)) => a.cmp(&b),
+            _ => a.cmp(b),
+        },
+        _ => a.cmp(&b),
+    }
 }

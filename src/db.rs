@@ -47,6 +47,7 @@ pub struct Params {
     pub series: String,
     pub language: String,
     pub format: String,
+    pub deduplicate: bool,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]

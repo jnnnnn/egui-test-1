@@ -4,3 +4,4 @@ mod app;
 mod db;
 mod download;
 pub use app::TemplateApp;
+mod uifilter;
