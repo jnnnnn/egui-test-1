@@ -30,6 +30,7 @@ fn clean_title(title: &str) -> String {
         .split(|c: char| c.is_ascii_punctuation())
         .next()
         .unwrap()
+        .trim()
         .to_string()
 }
 
