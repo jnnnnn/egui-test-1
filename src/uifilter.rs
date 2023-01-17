@@ -26,7 +26,7 @@ struct BookRef {
 }
 
 fn clean_title(title: &str) -> String {
-    title
+    title.to_lowercase()
         .split(|c: char| c.is_ascii_punctuation())
         .next()
         .unwrap()
