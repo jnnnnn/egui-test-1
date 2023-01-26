@@ -1,5 +1,6 @@
 use std::{
     error,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering::Relaxed},
         Arc, RwLock,
@@ -7,8 +8,11 @@ use std::{
     thread,
 };
 
+use config::Config;
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use rusqlite::{InterruptHandle, Row};
+
+use crate::config::load_settings;
 
 pub struct DB {
     query_send: Sender<Query>,
@@ -17,7 +21,7 @@ pub struct DB {
     pub processing: Arc<AtomicBool>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Book {
     pub collection: Collection,
     pub title: String,
@@ -31,6 +35,7 @@ pub struct Book {
     pub ipfs_cid: String,
     pub duplicates: std::sync::RwLock<usize>,
     pub download_status: std::sync::RwLock<String>,
+    pub download_path: PathBuf,
 }
 
 // a reference-counted public type for Book
@@ -173,7 +178,8 @@ fn start_query(
         ":language": query.params.language,
         ":format": query.params.format,
     ));
-    let mut rows = rows?.mapped(|row| row_to_book(query, row));
+    let config = load_settings();
+    let mut rows = rows?.mapped(|row| row_to_book(&config, query, row));
     loop {
         match rows.next() {
             Some(Ok(book)) => response_send.send(Ok(vec![book]))?,
@@ -183,7 +189,8 @@ fn start_query(
     }
 }
 
-fn row_to_book(query: &Query, row: &Row<'_>) -> Result<BookRef, rusqlite::Error> {
+fn row_to_book(config: &Config, query: &Query, row: &Row<'_>) -> Result<BookRef, rusqlite::Error> {
+    let path = download_path(&config, &row.get(1)?, &row.get(0)?, &row.get(7)?);
     Ok(Arc::new(Book {
         collection: query.params.collection.clone(),
         title: row.get(0)?,
@@ -197,5 +204,17 @@ fn row_to_book(query: &Query, row: &Row<'_>) -> Result<BookRef, rusqlite::Error>
         ipfs_cid: row.get(8)?,
         duplicates: RwLock::new(1),
         download_status: RwLock::new("".to_string()),
+        download_path: path,
     }))
+}
+
+fn download_path(config: &Config, authors: &String, title: &String, format: &String) -> PathBuf {
+    let author_subfolder = config.get::<bool>("authorSubfolder").unwrap_or_default();
+    let filename = match author_subfolder {
+        true => PathBuf::from(authors).join(title).with_extension(format),
+        false => PathBuf::from(format!("{} - {}", authors, title)).with_extension(format),
+    };
+    let download_path = config.get::<String>("downloadPath").unwrap_or_default();
+    let path = &Path::new(&download_path).join(filename);
+    return path.to_owned();
 }

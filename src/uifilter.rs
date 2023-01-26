@@ -125,7 +125,7 @@ fn compare(old: &BookRef, new: &BookRef) -> bool {
 // tests
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, RwLock};
+    use std::sync::Arc;
 
     use crate::db::Book;
 
@@ -137,30 +137,12 @@ mod tests {
         let old = Arc::new(Book {
             publisher: "".to_string(),
             year: "2002".to_string(),
-            title: "title".to_string(),
-            authors: "author".to_string(),
-            sizeinbytes: 100,
-            collection: crate::db::Collection::Fiction,
-            series: "Discworld 5".to_string(),
-            language: "en".to_string(),
-            format: "epub".to_string(),
-            ipfs_cid: "Qm123".to_string(),
-            duplicates: RwLock::new(1),
-            download_status: RwLock::new("".to_string()),
+            ..Default::default()
         });
         let new = Arc::new(Book {
             publisher: "publisher".to_string(),
             year: "2001".to_string(),
-            title: "title".to_string(),
-            authors: "author".to_string(),
-            sizeinbytes: 100,
-            collection: crate::db::Collection::Fiction,
-            series: "Discworld 5".to_string(),
-            language: "en".to_string(),
-            format: "epub".to_string(),
-            ipfs_cid: "Qm123".to_string(),
-            duplicates: RwLock::new(1),
-            download_status: RwLock::new("".to_string()),
+            ..Default::default()
         });
         assert!(compare(&old, &new));
         assert!(!compare(&new, &old));

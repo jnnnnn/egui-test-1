@@ -2,15 +2,10 @@ use bytes::Bytes;
 use config::Config;
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use fstrings::{f, format_args_f, println_f};
-use std::{
-    error,
-    path::{Path, PathBuf},
-    thread,
-    time::Duration,
-};
+use std::{error, thread, time::Duration};
 use tokio::task::JoinSet;
 
-use crate::db::BookRef;
+use crate::{config::load_settings, db::BookRef};
 
 #[derive(Debug, Default, Clone)]
 pub struct Status {
@@ -65,18 +60,7 @@ fn start_download(
     config: &Config,
 ) -> Result<(), Box<dyn error::Error>> {
     status.description = format!("Downloading {}", book.title);
-
-    let author_subfolder = config.get::<bool>("authorSubfolder").unwrap_or_default();
-    let filename = match author_subfolder {
-        true => PathBuf::from(&book.authors)
-            .join(&book.title)
-            .with_extension(&book.format),
-        false => PathBuf::from(format!("{} - {}", &book.authors, &book.title))
-            .with_extension(&book.format),
-    };
-    let download_path = config.get::<String>("downloadPath")?;
-    let path = &Path::new(&download_path).join(filename);
-
+    let path = &book.download_path;
     if path.exists() {
         status.description = f!("{book.title} already exists");
         status_send.send(status.clone())?;
@@ -164,20 +148,4 @@ async fn download_file(host: &String, book: &BookRef) -> Result<Bytes, Box<dyn e
         println_f!("Downloaded {}", url);
     }
     result
-}
-
-fn load_settings() -> Config {
-    let config = Config::builder()
-        // Add in `./Settings.*`
-        .add_source(config::File::with_name("Settings"))
-        // Add in settings from the environment (with a prefix of APP)
-        // Eg.. `APP_DEBUG=1 ./target/app` would set the `debug` key
-        .add_source(config::Environment::with_prefix("APP"))
-        .build();
-
-    if let Err(e) = &config {
-        eprintln!("Error loading config: {}", e);
-    }
-
-    config.unwrap_or_default()
 }
