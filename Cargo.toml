@@ -9,17 +9,21 @@ rust-version = "1.64"
 
 
 [dependencies]
-egui = { version = "0.20.1" }
-eframe = { version = "0.20.1", features = ["glow", "persistence"], default-features = false }
+# use the git repo because there's a bug in 0.20.1 -- window.width = 0 causes a panic
+# eframe = { version = "0.20.1", features = ["glow", "persistence"], default-features = false }
+egui = { git = "https://github.com/emilk/egui", rev = "8ce0e1c", package = "egui" }
+eframe = { git = "https://github.com/emilk/egui", rev = "8ce0e1c", package = "eframe", features = ["glow", "persistence"], default-features = false }
+egui_extras = { git = "https://github.com/emilk/egui", rev = "8ce0e1c", package = "egui_extras" }
 serde = { version = "1", default-features = false } # You only need this if you want app persistence
-egui_extras = "0.20.0"
-rusqlite = { version = "0.28.0", features = ["bundled"], default-features = false }
-config = { version = "0.13.2" }
-crossbeam = { version = "0.8.2", features = ["std"], default-features = false }
-fstrings = "0.2.3"
-reqwest = { version = "0.11.12", features = ["blocking"] }
+rusqlite = { version = "0.28.0", features = [
+    "bundled",
+], default-features = false }
+config = { version = "^0.13" }
+crossbeam = { version = "^0.8", features = ["std"], default-features = false }
+fstrings = "^0.2"
+reqwest = { version = "^0.11", features = ["blocking"] }
 regex = { features = ["std"], default-features = false, version = "1.6.0" }
-tokio = { version = "1.21.2", default-features = false }
+tokio = { version = "^1.21", default-features = false }
 bytes = { default-features = false, version = "1.2.1" }
 image = { default-features = false, features = ["png"], version = "0.24.4" }
 

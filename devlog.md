@@ -86,3 +86,26 @@ Built a release:
 ```sh
 cargo build --release
 ```
+
+## 2023-01-26
+
+tried to run again. weird error:
+
+    thread 'main' panicked at 'called `Option::unwrap()` on a `None` value', 
+    C:\Users\J\.cargo\registry\src\github.com-1ecc6299db9ec823\eframe-0.20.1\src\native\run.rs:399:58
+
+I think this is because the window frame is wrong? the code at that point is 
+
+```rust
+std::num::NonZeroU32::new(width).unwrap()
+```
+
+but `winit_window: winit::window::Window` is (0,0) which is not nonzero. Not sure where the zeros are coming from but egui storage [says](https://github.com/emilk/egui/discussions/1698) native ?  Can't figure out how to reset this either. Tried putting some initializers in the startup but no help.
+
+Ah it's a bug in eframe. It's already fixed but not released, using `.atleast(1)` instead of `.unwrap()`.
+
+In order to use the fix, I can depend on the git repo instead of the cargo package.
+
+Nope that doens't work either, some dependency conflict for the `thiserror` package -- egui requires `^1.0.37` ... but I'm locked to 1.0.32 by my cargo.lock. Ah, regenerate with `cargo update` and it works.
+
+Add config setting to save books in an author subfolder or with a prefix.

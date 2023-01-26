@@ -10,7 +10,7 @@ use std::{
 };
 use tokio::task::JoinSet;
 
-use crate::db::{Book};
+use crate::db::Book;
 
 #[derive(Debug, Default, Clone)]
 pub struct Status {
@@ -65,8 +65,15 @@ fn start_download(
     config: &Config,
 ) -> Result<(), Box<dyn error::Error>> {
     status.description = format!("Downloading {}", book.title);
-    
-    let filename = filename(book);
+
+    let author_subfolder = config.get::<bool>("authorSubfolder").unwrap_or_default();
+    let filename = match author_subfolder {
+        true => PathBuf::from(&book.authors)
+            .join(&book.title)
+            .with_extension(&book.format),
+        false => PathBuf::from(format!("{} - {}", &book.authors, &book.title))
+            .with_extension(&book.format),
+    };
     let download_path = config.get::<String>("downloadPath")?;
     let path = &Path::new(&download_path).join(filename);
 
@@ -173,10 +180,4 @@ fn load_settings() -> Config {
     }
 
     config.unwrap_or_default()
-}
-
-fn filename(book: &Book) -> PathBuf {
-    PathBuf::from(&book.authors)
-        .join(&book.title)
-        .with_extension(&book.format)
 }

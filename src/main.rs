@@ -15,13 +15,20 @@ fn main() {
 
     let native_options = eframe::NativeOptions {
         icon_data: load_icon(PathBuf::from(".").join("assets").join("icon-256.png")),
+        initial_window_pos: Some(egui::Pos2::new(100.0, 100.0)),
+        initial_window_size: Some(egui::Vec2::new(800.0, 600.0)),
         ..Default::default()
     };
-    eframe::run_native(
+    
+    let result = eframe::run_native(
         "eframe template",
         native_options,
+
         Box::new(|cc| Box::new(rlgdesktop::TemplateApp::new(cc))),
     );
+    if result.is_err() {
+        println!("Error: {:?}", result);
+    }
 }
 
 // when compiling to web using trunk.

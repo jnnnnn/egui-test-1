@@ -119,7 +119,7 @@ impl eframe::App for TemplateApp {
                 changed = false;
             }
 
-            ui.checkbox(&mut filters.deduplicate, "Remove duplicates");
+            changed |= ui.checkbox(&mut filters.deduplicate, "Remove duplicates").changed();
 
             changed |= render_filter(ui, "Title", &mut filters.title);
             changed |= render_filter(ui, "Authors", &mut filters.authors);
