@@ -1,4 +1,8 @@
-use std::{cmp::Ordering, ops::RangeInclusive, sync::{atomic::Ordering::Relaxed, RwLock}};
+use std::{
+    cmp::Ordering,
+    ops::RangeInclusive,
+    sync::{atomic::Ordering::Relaxed, RwLock},
+};
 
 use egui_extras::{Column, TableBuilder};
 
@@ -119,7 +123,9 @@ impl eframe::App for TemplateApp {
                 changed = false;
             }
 
-            changed |= ui.checkbox(&mut filters.deduplicate, "Remove duplicates").changed();
+            changed |= ui
+                .checkbox(&mut filters.deduplicate, "Remove duplicates")
+                .changed();
 
             changed |= render_filter(ui, "Title", &mut filters.title);
             changed |= render_filter(ui, "Authors", &mut filters.authors);
@@ -231,13 +237,7 @@ fn render_results_table(
     })
     .body(|body| {
         body.rows(20.0, books.len(), |i, mut row| {
-            row.col(|ui| {
-                if ui.button("download").clicked() {
-                    if let Err(_) = download.queue.send(books[i].clone()) {
-                        eprintln!("Failed to send download request");
-                    }
-                }
-            });
+            render_download_cell(&mut row, download, &books[i]);
             render_text_cell(&mut row, books[i].title.as_str());
             render_text_cell(&mut row, books[i].authors.as_str());
             render_text_cell(&mut row, books[i].series.as_str());
@@ -252,6 +252,20 @@ fn render_results_table(
             );
             render_text_cell(&mut row, books[i].format.as_str());
         });
+    });
+}
+
+fn render_download_cell(
+    row: &mut egui_extras::TableRow<'_, '_>,
+    download: &download::Download,
+    book: &db::BookRef,
+) {
+    row.col(|ui| {
+        if ui.button("download").clicked() {
+            if let Err(_) = download.queue.send(book.clone()) {
+                eprintln!("Failed to send download request");
+            }
+        }
     });
 }
 
