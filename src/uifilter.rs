@@ -27,6 +27,12 @@ struct BookRef {
 
 fn clean_title(title: &str) -> String {
     title.to_lowercase()
+        .replace("the ", "")
+        .replace("a ", "")
+        .replace('\'', "")
+        .replace('-', "")
+        .replace(' ', "")
+        // many titles have junk in braces at the end
         .split(|c: char| c.is_ascii_punctuation())
         .next()
         .unwrap()
