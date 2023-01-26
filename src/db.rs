@@ -2,7 +2,7 @@ use std::{
     error,
     sync::{
         atomic::{AtomicBool, Ordering::Relaxed},
-        Arc,
+        Arc, RwLock,
     },
     thread,
 };
@@ -12,12 +12,12 @@ use rusqlite::{InterruptHandle, Row};
 
 pub struct DB {
     query_send: Sender<Query>,
-    response_receive: Receiver<Result<Vec<Book>, String>>,
+    response_receive: Receiver<Result<Vec<BookRef>, String>>,
     interrupt: Option<InterruptHandle>,
     pub processing: Arc<AtomicBool>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Book {
     pub collection: Collection,
     pub title: String,
@@ -29,8 +29,12 @@ pub struct Book {
     pub sizeinbytes: i64,
     pub format: String,
     pub ipfs_cid: String,
-    pub duplicates: usize,
+    pub duplicates: std::sync::RwLock<usize>,
+    pub download_status: std::sync::RwLock<String>,
 }
+
+// a reference-counted public type for Book
+pub type BookRef = Arc<Book>;
 
 #[derive(Debug)]
 pub struct Query {
@@ -38,8 +42,7 @@ pub struct Query {
     pub params: Params,
 }
 
-#[derive(Debug, Default, Clone)]
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct Params {
     pub collection: Collection,
@@ -51,8 +54,7 @@ pub struct Params {
     pub deduplicate: bool,
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum Collection {
     #[default]
     Fiction,
@@ -63,7 +65,7 @@ impl DB {
     // open a new DB connection.
     pub fn new(conn: &str) -> Self {
         let (query_send, query_receive) = unbounded::<Query>();
-        let (response_send, response_receive) = unbounded::<Result<Vec<Book>, String>>();
+        let (response_send, response_receive) = unbounded::<Result<Vec<BookRef>, String>>();
         let conn = conn.to_owned();
 
         let processing = Arc::new(AtomicBool::new(false));
@@ -140,7 +142,7 @@ impl DB {
     }
 
     // see if there's a result available from the db thread
-    pub fn get_result(&self) -> Option<Result<Vec<Book>, String>> {
+    pub fn get_result(&self) -> Option<Result<Vec<BookRef>, String>> {
         match self.response_receive.try_recv() {
             Ok(Ok(books)) => Some(Ok(books)),
             Ok(Err(err)) => Some(Err(err)),
@@ -161,7 +163,7 @@ impl DB {
 fn start_query(
     connection: &rusqlite::Connection,
     query: &Query,
-    response_send: &Sender<Result<Vec<Book>, String>>,
+    response_send: &Sender<Result<Vec<BookRef>, String>>,
 ) -> Result<(), Box<dyn error::Error>> {
     let mut stmt = connection.prepare(&query.stmt)?;
     let rows = stmt.query(rusqlite::named_params!(
@@ -181,8 +183,8 @@ fn start_query(
     }
 }
 
-fn row_to_book(query: &Query, row: &Row<'_>) -> Result<Book, rusqlite::Error> {
-    Ok(Book {
+fn row_to_book(query: &Query, row: &Row<'_>) -> Result<BookRef, rusqlite::Error> {
+    Ok(Arc::new(Book {
         collection: query.params.collection.clone(),
         title: row.get(0)?,
         authors: row.get(1)?,
@@ -193,6 +195,7 @@ fn row_to_book(query: &Query, row: &Row<'_>) -> Result<Book, rusqlite::Error> {
         sizeinbytes: row.get(6)?,
         format: row.get(7)?,
         ipfs_cid: row.get(8)?,
-        duplicates: 1
-    })
+        duplicates: RwLock::new(1),
+        download_status: RwLock::new("".to_string()),
+    }))
 }

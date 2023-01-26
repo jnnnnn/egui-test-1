@@ -109,3 +109,12 @@ In order to use the fix, I can depend on the git repo instead of the cargo packa
 Nope that doens't work either, some dependency conflict for the `thiserror` package -- egui requires `^1.0.37` ... but I'm locked to 1.0.32 by my cargo.lock. Ah, regenerate with `cargo update` and it works.
 
 Add config setting to save books in an author subfolder or with a prefix.
+
+## 2023-01-27
+
+Starting to think about showing download status in the UI. This will require synchronization between threads. Cloning the `Book` everywhere makes this a little tricky -- do I:
+ - refactor to stop cloning book (use Arc instead)
+ - put an Arc to the download status inside the book and keep cloning the book itself (easier)
+ - put most of the fields inside an inner BookShared object that is reference-counted (and thus shared between clones)
+
+I think it makes the most sense to Arc the whole book. That makes accesses to the book fields a little more complicated but handling groups of books is much more efficient.

@@ -2043,7 +2043,6 @@ dependencies = [
  "egui_extras",
  "fstrings",
  "image",
- "once_cell",
  "regex",
  "reqwest",
  "rusqlite",

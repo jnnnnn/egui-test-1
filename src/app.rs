@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, ops::RangeInclusive, sync::atomic::Ordering::Relaxed};
+use std::{cmp::Ordering, ops::RangeInclusive, sync::{atomic::Ordering::Relaxed, RwLock}};
 
 use egui_extras::{Column, TableBuilder};
 
@@ -25,7 +25,7 @@ pub struct TemplateApp {
     #[serde(skip)]
     download_status: download::Status,
     #[serde(skip)]
-    results: Result<Vec<db::Book>, String>,
+    results: Result<Vec<db::BookRef>, String>,
     #[serde(skip)]
     uifilter: UIFilter,
 }
@@ -168,8 +168,8 @@ impl eframe::App for TemplateApp {
 }
 
 fn read_results(
-    results: &mut Result<Vec<db::Book>, String>,
-    mut newbooks: Vec<db::Book>,
+    results: &mut Result<Vec<db::BookRef>, String>,
+    mut newbooks: Vec<db::BookRef>,
     uifilter: &mut UIFilter,
     deduplicate: bool,
     ctx: &egui::Context,
@@ -203,7 +203,7 @@ fn render_filter(ui: &mut egui::Ui, label: &str, text: &mut String) -> bool {
 
 fn render_results_table(
     ui: &mut egui::Ui,
-    books: &mut Vec<db::Book>,
+    books: &mut Vec<db::BookRef>,
     download: &download::Download,
 ) {
     let mut tb = TableBuilder::new(ui);
@@ -244,7 +244,8 @@ fn render_results_table(
             render_text_cell(&mut row, books[i].year.as_str());
             render_text_cell(&mut row, books[i].language.as_str());
             render_text_cell(&mut row, books[i].publisher.as_str());
-            render_text_cell(&mut row, books[i].duplicates.to_string().as_str());
+            let dups = books[i].duplicates.read().unwrap().to_string();
+            render_text_cell(&mut row, &dups);
             render_text_cell(
                 &mut row,
                 format!("{:.0}", books[i].sizeinbytes as f32 / 1024.0).as_str(),
@@ -254,7 +255,7 @@ fn render_results_table(
     });
 }
 
-fn sort_books(col: &&str, books: &mut Vec<db::Book>) {
+fn sort_books(col: &&str, books: &mut Vec<db::BookRef>) {
     books.sort_by(|a, b| match *col {
         "Title" => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
         "Authors" => a.authors.to_lowercase().cmp(&b.authors.to_lowercase()),
@@ -262,7 +263,7 @@ fn sort_books(col: &&str, books: &mut Vec<db::Book>) {
         "Year" => a.year.cmp(&b.year),
         "Language" => a.language.cmp(&b.language),
         "Publisher" => a.publisher.cmp(&b.publisher),
-        "Duplicates" => b.duplicates.cmp(&a.duplicates),
+        "Duplicates" => compare_duplicates(&b.duplicates, &a.duplicates),
         "FileSize" => a.sizeinbytes.cmp(&b.sizeinbytes),
         "Format" => a.format.to_lowercase().cmp(&b.format.to_lowercase()),
         &_ => Ordering::Equal,
@@ -288,4 +289,10 @@ fn compare_series(a: &str, b: &str) -> Ordering {
         },
         _ => a.cmp(&b),
     }
+}
+
+fn compare_duplicates(a: &RwLock<usize>, b: &RwLock<usize>) -> Ordering {
+    let a = a.read().unwrap();
+    let b = b.read().unwrap();
+    a.cmp(&b)
 }

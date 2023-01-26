@@ -10,7 +10,7 @@ use std::{
 };
 use tokio::task::JoinSet;
 
-use crate::db::Book;
+use crate::db::BookRef;
 
 #[derive(Debug, Default, Clone)]
 pub struct Status {
@@ -20,13 +20,13 @@ pub struct Status {
 }
 
 pub struct Download {
-    pub queue: Sender<Book>,
+    pub queue: Sender<BookRef>,
     pub status: Receiver<Status>,
 }
 
 impl Download {
     pub fn new() -> Self {
-        let (queue, recv) = unbounded::<Book>();
+        let (queue, recv) = unbounded::<BookRef>();
         let (status_send, status_recv) = unbounded::<Status>();
         let config = load_settings();
         let mut status = Status::default();
@@ -59,7 +59,7 @@ impl Download {
 }
 
 fn start_download(
-    book: &Book,
+    book: &BookRef,
     status: &mut Status,
     status_send: &Sender<Status>,
     config: &Config,
@@ -116,7 +116,7 @@ fn start_download(
     Ok(())
 }
 
-async fn download_race(hosts: Vec<String>, book: &Book) -> Result<Bytes, String> {
+async fn download_race(hosts: Vec<String>, book: &BookRef) -> Result<Bytes, String> {
     // start a download for each host
     let mut set = JoinSet::<Result<Bytes, String>>::new();
 
@@ -143,7 +143,7 @@ async fn download_race(hosts: Vec<String>, book: &Book) -> Result<Bytes, String>
     Err("No downloads succeeded".to_string())
 }
 
-async fn download_file(host: &String, book: &Book) -> Result<Bytes, Box<dyn error::Error>> {
+async fn download_file(host: &String, book: &BookRef) -> Result<Bytes, Box<dyn error::Error>> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()?;
