@@ -31,6 +31,9 @@ impl Download {
             if let Ok(book) = recv.recv() {
                 if let Err(e) = start_download(&book, &mut status, &status_send, &config) {
                     eprintln!("Error downloading book {}: {}", book.title, e);
+                    if let Ok(mut s) = book.download_status.write() {
+                        *s = format!("Error: {}", e);
+                    }
                     status.description = format!("Error: {}", e);
                     status.errors += 1;
                     if let Err(e) = status_send.send(status.clone()) {
@@ -60,11 +63,17 @@ fn start_download(
     config: &Config,
 ) -> Result<(), Box<dyn error::Error>> {
     status.description = format!("Downloading {}", book.title);
+    if let Ok(mut s) = book.download_status.write() {
+        *s = String::from("Downloading")
+    }
     let path = &book.download_path;
     if path.exists() {
         status.description = f!("{book.title} already exists");
         status_send.send(status.clone())?;
         println!("{} already exists at {}", book.title, path.display());
+        if let Ok(mut s) = book.download_status.write() {
+            *s = String::from("Exists")
+        }
         return Ok(());
     }
 
@@ -89,10 +98,16 @@ fn start_download(
             println!("Wrote {}", path.display());
             status.completed += 1;
             status.description = f!("Downloaded {book.title}");
+            if let Ok(mut s) = book.download_status.write() {
+                *s = String::from("Downloaded")
+            }
             status_send.send(status.clone())?;
         }
         Err(e) => {
             status.description = format!("Error downloading {}: {}", book.title, e);
+            if let Ok(mut s) = book.download_status.write() {
+                *s = format!("Error: {}", e);
+            }
             status.errors += 1;
             status_send.send(status.clone())?;
         }

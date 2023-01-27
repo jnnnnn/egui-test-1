@@ -260,10 +260,25 @@ fn render_download_cell(
     download: &download::Download,
     book: &db::BookRef,
 ) {
+    let download_status = if let Ok(status) = book.download_status.read() {
+        status.clone()
+    } else {
+        String::from("")
+    };
     row.col(|ui| {
-        if ui.button("download").clicked() {
-            if let Err(_) = download.queue.send(book.clone()) {
-                eprintln!("Failed to send download request");
+        match download_status {
+            s if s == "" => {
+                if ui.button("download").clicked() {
+                    if let Ok(mut status) = book.download_status.write() {
+                        *status = String::from("Queued");
+                    }
+                    if let Err(_) = download.queue.send(book.clone()) {
+                        eprintln!("Failed to send download request");
+                    }
+                }
+            }
+            s => {
+                ui.label(s);
             }
         }
     });
