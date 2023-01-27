@@ -72,7 +72,7 @@ fn start_download(
         status_send.send(status.clone())?;
         println!("{} already exists at {}", book.title, path.display());
         if let Ok(mut s) = book.download_status.write() {
-            *s = String::from("Exists")
+            *s = String::from("Done")
         }
         return Ok(());
     }
@@ -99,7 +99,7 @@ fn start_download(
             status.completed += 1;
             status.description = f!("Downloaded {book.title}");
             if let Ok(mut s) = book.download_status.write() {
-                *s = String::from("Downloaded")
+                *s = String::from("Done")
             }
             status_send.send(status.clone())?;
         }

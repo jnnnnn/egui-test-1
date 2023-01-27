@@ -203,7 +203,7 @@ fn row_to_book(config: &Config, query: &Query, row: &Row<'_>) -> Result<BookRef,
         format: row.get(7)?,
         ipfs_cid: row.get(8)?,
         duplicates: RwLock::new(1),
-        download_status: RwLock::new("".to_string()),
+        download_status: RwLock::new("?".to_string()),
         download_path: path,
     }))
 }

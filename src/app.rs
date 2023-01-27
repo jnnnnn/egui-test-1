@@ -1,6 +1,7 @@
 use std::{
     cmp::Ordering,
     ops::RangeInclusive,
+    path::PathBuf,
     sync::{atomic::Ordering::Relaxed, RwLock},
 };
 
@@ -8,7 +9,7 @@ use egui_extras::{Column, TableBuilder};
 
 use crate::{
     db::{
-        self,
+        self, BookRef,
         Collection::{Fiction, NonFiction},
     },
     download,
@@ -260,28 +261,52 @@ fn render_download_cell(
     download: &download::Download,
     book: &db::BookRef,
 ) {
-    let download_status = if let Ok(status) = book.download_status.read() {
+    let mut download_status = if let Ok(status) = book.download_status.read() {
         status.clone()
     } else {
         String::from("")
     };
-    row.col(|ui| {
-        match download_status {
-            s if s == "" => {
-                if ui.button("download").clicked() {
-                    if let Ok(mut status) = book.download_status.write() {
-                        *status = String::from("Queued");
-                    }
-                    if let Err(_) = download.queue.send(book.clone()) {
-                        eprintln!("Failed to send download request");
-                    }
+    if download_status == "?" {
+        download_status = check_downloaded(book);
+    }
+
+    row.col(|ui| match download_status {
+        s if s == "" => {
+            if ui.button("download").clicked() {
+                if let Ok(mut status) = book.download_status.write() {
+                    *status = String::from("Queued");
+                }
+                if let Err(_) = download.queue.send(book.clone()) {
+                    eprintln!("Failed to send download request");
                 }
             }
-            s => {
-                ui.label(s);
+        }
+        s if s == "Done" => {
+            if ui.button("open").clicked() {
+                if let Err(e) =
+                    open::that(book.download_path.parent().unwrap_or(&PathBuf::from(".")))
+                {
+                    eprintln!("Failed to open file: {}", e);
+                }
             }
         }
+        s => {
+            ui.label(s);
+        }
     });
+}
+
+fn check_downloaded(book: &BookRef) -> String {
+    let mut status = String::from("");
+    if let Ok(path) = book.download_path.canonicalize() {
+        if path.exists() {
+            status = String::from("Done");
+        }
+    }
+    if let Ok(mut status_ref) = book.download_status.write() {
+        *status_ref = status.clone();
+    }
+    return status;
 }
 
 fn sort_books(col: &&str, books: &mut Vec<db::BookRef>) {
