@@ -1,3 +1,5 @@
+dbPath: "./fiction-full.sqlite"
 downloadPath: "c:\\users\\adam\\books"
 authorSubfolder: False
+compressedDb: True
 url_ipfs_hosts: cloudflare-ipfs.com ipfs.io gateway.pinata.cloud crustwebsites.net

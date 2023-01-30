@@ -19,7 +19,6 @@ use crate::{
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct TemplateApp {
-    db_path: String,
     filters: db::Params,
     #[serde(skip)]
     value: f32,
@@ -38,7 +37,6 @@ pub struct TemplateApp {
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
-            db_path: "".to_owned(),
             value: 2.7,
             filters: db::Params::default(),
             db: None,
@@ -79,7 +77,6 @@ impl eframe::App for TemplateApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let Self {
-            db_path,
             value: _,
             filters,
             db,
@@ -99,20 +96,13 @@ impl eframe::App for TemplateApp {
                     None => break,
                 }
             }
-        } else if !db_path.is_empty() {
-            *db = Some(db::DB::new(db_path));
+        } else {
+            *db = Some(db::DB::new());
         }
 
         // For inspiration and more examples, go to https://emilk.github.io/egui
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             ui.heading("Side Panel");
-
-            ui.horizontal(|ui| {
-                ui.label("DB Path: ");
-                if ui.text_edit_singleline(db_path).changed() {
-                    *db = Some(db::DB::new(db_path));
-                }
-            });
 
             let mut changed = true;
             let f = filters.collection == Fiction;

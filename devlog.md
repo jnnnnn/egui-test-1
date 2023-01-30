@@ -118,3 +118,9 @@ Starting to think about showing download status in the UI. This will require syn
  - put most of the fields inside an inner BookShared object that is reference-counted (and thus shared between clones)
 
 I think it makes the most sense to Arc the whole book. That makes accesses to the book fields a little more complicated but handling groups of books is much more efficient.
+
+## 2023-01-30
+
+working out a smaller DB for distribution with executable so that self-contained.
+
+Additional SQL in [compress-db.sql](compress-db.sql).

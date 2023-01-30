@@ -19,6 +19,7 @@ pub struct DB {
     response_receive: Receiver<Result<Vec<BookRef>, String>>,
     interrupt: Option<InterruptHandle>,
     pub processing: Arc<AtomicBool>,
+    config: Config,
 }
 
 #[derive(Debug, Default)]
@@ -68,20 +69,24 @@ pub enum Collection {
 
 impl DB {
     // open a new DB connection.
-    pub fn new(conn: &str) -> Self {
+    pub fn new() -> Self {
         let (query_send, query_receive) = unbounded::<Query>();
         let (response_send, response_receive) = unbounded::<Result<Vec<BookRef>, String>>();
-        let conn = conn.to_owned();
-
+        
         let processing = Arc::new(AtomicBool::new(false));
 
+        let config = load_settings();
+        let conn = config.get::<String>("dbPath").unwrap_or("".to_string());
+
         // check that file exists
-        if !std::path::Path::new(&conn).exists() {
+        if !std::path::Path::new(&conn).exists() {            
+            eprintln!("Error opening database: {} does not exist", conn);
             return Self {
                 query_send,
                 response_receive,
                 interrupt: None,
                 processing,
+                config,
             };
         }
 
@@ -93,6 +98,7 @@ impl DB {
                 response_receive,
                 interrupt: None,
                 processing,
+                config,
             };
         }
         let connection = connection.unwrap();
@@ -119,6 +125,7 @@ impl DB {
             response_receive,
             interrupt,
             processing,
+            config,
         }
     }
 
@@ -126,21 +133,39 @@ impl DB {
     pub fn query(&self, params: Params) {
         // https://www.sqlite.org/fts5.html
         // search the fiction_fts table for query
-        let stmt = format!("
-        SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, fh.ipfs_cid as ipfs_cid
-        FROM {0} f
-        join {0}_hashes as fh on LOWER(f.md5) = fh.md5
-        WHERE 
-            f.title LIKE '%'||:title||'%' AND 
-            f.author LIKE '%'||:authors||'%' AND
-            f.series LIKE '%'||:series||'%' AND
-            f.language LIKE '%'||:language||'%' AND
-            f.extension LIKE '%'||:format||'%'
-        ORDER BY f.author, f.title, f.filesize
-        ", match params.collection {
-            Collection::NonFiction => "non_fiction",
-            _ => "fiction",
-        });
+        let stmt = if self.config.get::<bool>("compressedDb").unwrap_or(false) {
+            format!("
+            SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, f.ipfs_cid as ipfs_cid
+            FROM {0} f
+            WHERE 
+                f.title LIKE '%'||:title||'%' AND 
+                f.author LIKE '%'||:authors||'%' AND
+                f.series LIKE '%'||:series||'%' AND
+                f.language LIKE '%'||:language||'%' AND
+                f.extension LIKE '%'||:format||'%'
+            ORDER BY f.author, f.title, f.filesize
+            ", match params.collection {
+                Collection::NonFiction => "non_fiction",
+                _ => "fiction",
+            })
+        }
+        else {
+            format!("
+            SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, fh.ipfs_cid as ipfs_cid
+            FROM {0} f
+            join {0}_hashes as fh on LOWER(f.md5) = fh.md5
+            WHERE 
+                f.title LIKE '%'||:title||'%' AND 
+                f.author LIKE '%'||:authors||'%' AND
+                f.series LIKE '%'||:series||'%' AND
+                f.language LIKE '%'||:language||'%' AND
+                f.extension LIKE '%'||:format||'%'
+            ORDER BY f.author, f.title, f.filesize
+            ", match params.collection {
+                Collection::NonFiction => "non_fiction",
+                _ => "fiction",
+            })
+        };
         if let Err(e) = self.query_send.send(Query { stmt, params }) {
             eprintln!("Error enqueueing query: {}", e);
         }
