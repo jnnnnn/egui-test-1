@@ -7,13 +7,13 @@ rust-version = "1.64"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-
 [dependencies]
-# use the git repo because there's a bug in 0.20.1 -- window.width = 0 causes a panic
-# eframe = { version = "0.20.1", features = ["glow", "persistence"], default-features = false }
-egui = { git = "https://github.com/emilk/egui", rev = "8ce0e1c", package = "egui" }
-eframe = { git = "https://github.com/emilk/egui", rev = "8ce0e1c", package = "eframe", features = ["glow", "persistence"], default-features = false }
-egui_extras = { git = "https://github.com/emilk/egui", rev = "8ce0e1c", package = "egui_extras" }
+egui = { version = "0.20.1" }
+eframe = { version = "0.20.1", features = [
+    "glow",
+    "persistence",
+], default-features = false }
+egui_extras = { version = "0.20.0" }
 serde = { version = "1", default-features = false } # You only need this if you want app persistence
 rusqlite = { version = "0.28.0", features = [
     "bundled",
@@ -48,8 +48,10 @@ strip = true  # Automatically strip symbols from the binary.
 [patch.crates-io]
 
 # If you want to use the bleeding edge version of egui and eframe:
-# egui = { git = "https://github.com/emilk/egui", branch = "master" }
-# eframe = { git = "https://github.com/emilk/egui", branch = "master" }
+# - this is needed at the moment because of an unreleased bugfix at https://github.com/emilk/egui/blob/37fd141dd189196f673a4281114409f95b13b643/crates/eframe/src/native/run.rs#L433-L434
+egui = { git = "https://github.com/emilk/egui", rev = "8ce0e1c", package = "egui" }
+eframe = { git = "https://github.com/emilk/egui", rev = "8ce0e1c", package = "eframe" }
+egui_extras = { git = "https://github.com/emilk/egui", rev = "8ce0e1c", package = "egui_extras" }
 
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }

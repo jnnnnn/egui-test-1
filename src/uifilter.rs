@@ -96,6 +96,11 @@ pub fn filter_update_booklist(f: &mut UIFilter, books: &mut Vec<BookRef>, newboo
 fn compare(old: &BookRef, new: &BookRef) -> bool {
     assert_eq!(clean_title(&old.title), clean_title(&new.title));
 
+    // always choose epub if available
+    if old.format.eq("epub") != new.format.eq("epub") {
+        return new.format.eq("epub");
+    }
+
     // if the new book is more than ten times larger, skip it
     if new.sizeinbytes > old.sizeinbytes * 10 {
         return false;
