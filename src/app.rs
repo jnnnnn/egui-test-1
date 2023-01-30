@@ -203,7 +203,9 @@ fn render_results_table(
     books: &mut Vec<db::BookRef>,
     download: &download::Download,
 ) {
-    let mut tb = TableBuilder::new(ui);
+    let mut tb = TableBuilder::new(ui)
+        .max_scroll_height(10_000.0)
+        .striped(true);
     for col in COLUMNS.iter() {
         let minwidth = match *col {
             "Title" => 200.0,
@@ -217,7 +219,6 @@ fn render_results_table(
                 .clip(true),
         );
     }
-    tb = tb.max_scroll_height(10_000.0);
     tb.header(20.0, |mut header| {
         for col in COLUMNS.iter() {
             header.col(|ui| {
