@@ -124,3 +124,20 @@ I think it makes the most sense to Arc the whole book. That makes accesses to th
 working out a smaller DB for distribution with executable so that self-contained.
 
 Additional SQL in [compress-db.sql](compress-db.sql).
+
+Wow, *so* much faster with an index that matches the order-by clause. Compressed DB is now just above 100MB.  Distributable.
+
+Try building for other platforms?! nah too hard.
+
+Try to fix the weird thing with the table not reaching the bottom of the window. How does the debug thing work in the demos?
+
+    structure of the ui when you hover with the mouse
+
+```rust
+ui.ctx().set_debug_on_hover(debug_on_hover);
+```
+
+well that's easy. seems like it is limiting itself.
+
+ctrl-click into the table code. omg this is readable as. right, `max_scroll_height` defaults to 800px. Change it.  Oohhhhhhhhh yeah.
+

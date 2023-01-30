@@ -217,6 +217,7 @@ fn render_results_table(
                 .clip(true),
         );
     }
+    tb = tb.max_scroll_height(10_000.0);
     tb.header(20.0, |mut header| {
         for col in COLUMNS.iter() {
             header.col(|ui| {
