@@ -42,13 +42,7 @@ drop table fiction
 
 ALTER TABLE new_fiction RENAME TO fiction
 
-CREATE INDEX "idx_fiction_Language" ON "fiction" (`Language`)
-
-CREATE INDEX "idx_fiction_Title" ON "fiction" (`Title`)
-
-CREATE INDEX "idx_fiction_Authors" ON "fiction" (`Author`)
-
-CREATE INDEX "idx_fiction_Series" ON "fiction" (`Series`)
+CREATE INDEX "idx_fiction_Search" ON "fiction" (`Author`, `Title`, `Series`)
 
 VACUUM 
 
