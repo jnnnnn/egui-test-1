@@ -3,3 +3,4 @@ downloadPath: "c:\\users\\adam\\books" # change me
 authorSubfolder: False # whether to group each author's books into a separate folder
 compressedDb: True # has `compress-db.sql` been run or is it a stock mysql dump
 url_ipfs_hosts: cloudflare-ipfs.com ipfs.io gateway.pinata.cloud crustwebsites.net
+linkBase: https://www.google.com/search?q= # hyperlink base for title and author. Blank for no links.

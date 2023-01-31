@@ -5,9 +5,12 @@ use std::{
     sync::{atomic::Ordering::Relaxed, RwLock},
 };
 
+use config::Config;
 use egui_extras::{Column, TableBuilder};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 
 use crate::{
+    config::load_settings,
     db::{
         self, BookRef,
         Collection::{Fiction, NonFiction},
@@ -32,6 +35,8 @@ pub struct TemplateApp {
     results: Result<Vec<db::BookRef>, String>,
     #[serde(skip)]
     uifilter: UIFilter,
+    #[serde(skip)]
+    config: Config,
 }
 
 impl Default for TemplateApp {
@@ -44,6 +49,7 @@ impl Default for TemplateApp {
             download: download::Download::new(),
             download_status: download::Status::default(),
             uifilter: UIFilter::default(),
+            config: load_settings(),
         }
     }
 }
@@ -84,6 +90,7 @@ impl eframe::App for TemplateApp {
             uifilter,
             download,
             download_status,
+            config,
         } = self;
 
         if let Some(db) = db {
@@ -155,7 +162,7 @@ impl eframe::App for TemplateApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| match results {
-            Ok(books) => render_results_table(ui, books, download),
+            Ok(books) => render_results_table(ui, books, download, config),
             Err(e) => {
                 ui.label(e.to_string());
                 ()
@@ -202,7 +209,9 @@ fn render_results_table(
     ui: &mut egui::Ui,
     books: &mut Vec<db::BookRef>,
     download: &download::Download,
+    config: &config::Config,
 ) {
+    let link_base = config.get::<String>("linkBase").unwrap_or("".to_string());
     let mut tb = TableBuilder::new(ui)
         .max_scroll_height(10_000.0)
         .striped(true);
@@ -231,8 +240,10 @@ fn render_results_table(
     .body(|body| {
         body.rows(20.0, books.len(), |i, mut row| {
             render_download_cell(&mut row, download, &books[i]);
-            render_text_cell(&mut row, books[i].title.as_str());
-            render_text_cell(&mut row, books[i].authors.as_str());
+            let authors = books[i].authors.as_str();
+            let title_query = format!("{} by {}", books[i].title, authors);
+            render_searchlink_cell(&mut row, books[i].title.as_str(), &link_base, &title_query);
+            render_searchlink_cell(&mut row, authors, &link_base, authors);
             render_text_cell(&mut row, books[i].series.as_str());
             render_text_cell(&mut row, books[i].year.as_str());
             render_text_cell(&mut row, books[i].language.as_str());
@@ -320,6 +331,23 @@ fn render_text_cell(row: &mut egui_extras::TableRow<'_, '_>, text: &str) {
     row.col(|ui| {
         ui.label(text);
     });
+}
+
+fn render_searchlink_cell(
+    row: &mut egui_extras::TableRow<'_, '_>,
+    text: &str,
+    link_base: &str,
+    query: &str,
+) {
+    let query = utf8_percent_encode(query, NON_ALPHANUMERIC).to_string();
+    if link_base == "" {
+        render_text_cell(row, text);
+    } else {
+        let url = format!("{}{}", link_base, query);
+        row.col(|ui| {
+            ui.hyperlink_to(text, url);
+        });
+    }
 }
 
 // parse out the number at the end of the series name

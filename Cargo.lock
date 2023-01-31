@@ -2054,6 +2054,7 @@ dependencies = [
  "fstrings",
  "image",
  "open",
+ "percent-encoding",
  "regex",
  "reqwest",
  "rusqlite",
