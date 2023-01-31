@@ -146,3 +146,7 @@ ctrl-click into the table code. omg this is readable as. right, `max_scroll_heig
 Can I compress the database more by removing duplicates from the DB? 1500k -> 648k. would drop compressed size from 150MB to 50MB. Windows binary is 8MB.
 
 Writing the dedup logic is too hard in sql.
+
+## 2023-02-01
+
+better compress script.

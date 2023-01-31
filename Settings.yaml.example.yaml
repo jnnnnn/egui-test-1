@@ -1,5 +1,5 @@
-dbPath: "./fiction-full.sqlite"
-downloadPath: "c:\\users\\adam\\books"
-authorSubfolder: False
-compressedDb: True
+dbPath: "./fiction-mini.sqlite"
+downloadPath: "c:\\users\\adam\\books" # change me
+authorSubfolder: False # whether to group each author's books into a separate folder
+compressedDb: True # has `compress-db.sql` been run or is it a stock mysql dump
 url_ipfs_hosts: cloudflare-ipfs.com ipfs.io gateway.pinata.cloud crustwebsites.net
