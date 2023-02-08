@@ -1,5 +1,4 @@
 use std::{
-    error,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering::Relaxed},
@@ -80,7 +79,7 @@ impl DB {
 
         // check that file exists
         if !std::path::Path::new(&conn).exists() {            
-            eprintln!("Error opening database: {} does not exist", conn);
+            log::error!("Error opening database: {} does not exist", conn);
             return Self {
                 query_send,
                 response_receive,
@@ -92,7 +91,7 @@ impl DB {
 
         let connection = rusqlite::Connection::open(&conn);
         if let Err(e) = connection {
-            eprintln!("Error opening database: {}", e);
+            log::error!("Error opening database: {}", e);
             return Self {
                 query_send,
                 response_receive,
@@ -114,7 +113,7 @@ impl DB {
                 processing_clone.store(true, Relaxed);
                 if let Err(e) = start_query(&connection, &query, &response_send) {
                     if let Err(e) = response_send.send(Err(e.to_string())) {
-                        eprintln!("Error sending error: {}", e);
+                        log::error!("Error sending error: {}", e);
                     }
                 }
             }
@@ -164,7 +163,7 @@ impl DB {
             })
         };
         if let Err(e) = self.query_send.send(Query { stmt, params }) {
-            eprintln!("Error enqueueing query: {}", e);
+            log::error!("Error enqueueing query: {}", e);
         }
     }
 
@@ -191,7 +190,7 @@ fn start_query(
     connection: &rusqlite::Connection,
     query: &Query,
     response_send: &Sender<Result<Vec<BookRef>, String>>,
-) -> Result<(), Box<dyn error::Error>> {
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut stmt = connection.prepare(&query.stmt)?;
     let rows = stmt.query(rusqlite::named_params!(
         ":title": query.params.title,

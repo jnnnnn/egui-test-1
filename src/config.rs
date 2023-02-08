@@ -1,6 +1,5 @@
 use config::Config;
 
-
 pub fn load_settings() -> Config {
     let config = Config::builder()
         // Add in `./Settings.*`
@@ -11,7 +10,7 @@ pub fn load_settings() -> Config {
         .build();
 
     if let Err(e) = &config {
-        eprintln!("Error loading config: {}", e);
+        log::error!("Error loading config: {}", e);
     }
 
     config.unwrap_or_default()

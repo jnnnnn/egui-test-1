@@ -69,6 +69,7 @@ const COLUMNS: &'static [&'static str] = &[
 
 impl TemplateApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        log::info!("App started");
         if let Some(storage) = cc.storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
@@ -161,14 +162,26 @@ impl eframe::App for TemplateApp {
             ui.label(format!("Downloaded: {:?}", download_status));
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| match results {
-            Ok(books) => render_results_table(ui, books, download, config),
-            Err(e) => {
-                ui.label(e.to_string());
-                ()
-            }
+        egui::CentralPanel::default().show(ctx, |ui| {
+            match results {
+                Ok(books) => render_results_table(ui, books, download, config),
+                Err(e) => {
+                    ui.label(e.to_string());
+                    ()
+                }
+            };
+        });
+
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            render_logs(ui);
         });
     }
+}
+
+fn render_logs(ui: &mut egui::Ui) -> () {
+    ui.separator();
+    let logtext = "".to_string();
+    ui.add(egui::TextEdit::multiline(&mut logtext.as_str()));
 }
 
 fn read_results(
@@ -280,7 +293,7 @@ fn render_download_cell(
                     *status = String::from("Queued");
                 }
                 if let Err(_) = download.queue.send(book.clone()) {
-                    eprintln!("Failed to send download request");
+                    log::error!("Failed to send download request");
                 }
             }
         }
@@ -289,7 +302,7 @@ fn render_download_cell(
                 if let Err(e) =
                     open::that(book.download_path.parent().unwrap_or(&PathBuf::from(".")))
                 {
-                    eprintln!("Failed to open file: {}", e);
+                    log::error!("Failed to open file: {}", e);
                 }
             }
         }

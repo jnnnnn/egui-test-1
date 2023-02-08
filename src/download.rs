@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use config::Config;
 use crossbeam::channel::{unbounded, Receiver, Sender};
-use fstrings::{f, format_args_f, println_f};
+use fstrings::{f, format_args_f};
 use std::{error, thread, time::Duration};
 use tokio::task::JoinSet;
 
@@ -30,14 +30,14 @@ impl Download {
         thread::spawn(move || loop {
             if let Ok(book) = recv.recv() {
                 if let Err(e) = start_download(&book, &mut status, &status_send, &config) {
-                    eprintln!("Error downloading book {}: {}", book.title, e);
+                    log::error!("Error downloading book {}: {}", book.title, e);
                     if let Ok(mut s) = book.download_status.write() {
                         *s = format!("Error: {}", e);
                     }
                     status.description = format!("Error: {}", e);
                     status.errors += 1;
                     if let Err(e) = status_send.send(status.clone()) {
-                        eprintln!("Error sending error: {}", e);
+                        log::error!("Error sending error: {}", e);
                     }
                 }
             } else {
@@ -70,7 +70,7 @@ fn start_download(
     if path.exists() {
         status.description = f!("{book.title} already exists");
         status_send.send(status.clone())?;
-        println!("{} already exists at {}", book.title, path.display());
+        log::info!("{} already exists at {}", book.title, path.display());
         if let Ok(mut s) = book.download_status.write() {
             *s = String::from("Done")
         }
@@ -95,7 +95,7 @@ fn start_download(
             status_send.send(status.clone())?;
             std::fs::create_dir_all(path.parent().unwrap())?;
             std::fs::write(path, bytes)?;
-            println!("Wrote {}", path.display());
+            log::info!("Wrote {}", path.display());
             status.completed += 1;
             status.description = f!("Downloaded {book.title}");
             if let Ok(mut s) = book.download_status.write() {
@@ -135,8 +135,8 @@ async fn download_race(hosts: Vec<String>, book: &BookRef) -> Result<Bytes, Stri
                 set.abort_all(); // abort the rest of the downloads
                 return Ok(bytes);
             }
-            Ok(Err(e)) => eprintln!("Error downloading: {}", e),
-            Err(e) => eprintln!("Error joining download: {}", e),
+            Ok(Err(e)) => log::error!("Error downloading: {}", e),
+            Err(e) => log::error!("Error joining download: {}", e),
         }
     }
     Err("No downloads succeeded".to_string())
@@ -160,7 +160,7 @@ async fn download_file(host: &String, book: &BookRef) -> Result<Bytes, Box<dyn e
     }
     let result = response.bytes().await.map_err(|e| e.into());
     if result.is_ok() {
-        println_f!("Downloaded {}", url);
+        log::info!("Downloaded {}", url);
     }
     result
 }

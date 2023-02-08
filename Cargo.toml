@@ -28,6 +28,7 @@ bytes = { default-features = false, version = "1.2.1" }
 image = { default-features = false, features = ["png"], version = "0.24.4" }
 open = "3"
 percent-encoding = "2.2.0"
+log = "0.4.17"
 
 [dev-dependencies]
 #once_cell = "1.17.0"

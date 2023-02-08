@@ -2042,7 +2042,7 @@ dependencies = [
 
 [[package]]
 name = "rlgdesktop"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "bytes",
  "config",
@@ -2053,6 +2053,7 @@ dependencies = [
  "egui_extras",
  "fstrings",
  "image",
+ "log",
  "open",
  "percent-encoding",
  "regex",
