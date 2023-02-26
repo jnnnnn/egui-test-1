@@ -71,14 +71,14 @@ impl DB {
     pub fn new() -> Self {
         let (query_send, query_receive) = unbounded::<Query>();
         let (response_send, response_receive) = unbounded::<Result<Vec<BookRef>, String>>();
-        
+
         let processing = Arc::new(AtomicBool::new(false));
 
         let config = load_settings();
         let conn = config.get::<String>("dbPath").unwrap_or("".to_string());
 
         // check that file exists
-        if !std::path::Path::new(&conn).exists() {            
+        if !std::path::Path::new(&conn).exists() {
             log::error!("Error opening database: {} does not exist", conn);
             return Self {
                 query_send,
@@ -144,8 +144,7 @@ impl DB {
                 f.extension LIKE '%'||:format||'%'
             ORDER BY f.author, f.title, f.filesize
             ")
-        }
-        else {
+        } else {
             format!("
             SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, fh.ipfs_cid as ipfs_cid
             FROM {0} f
@@ -229,11 +228,28 @@ fn row_to_book(config: &Config, query: &Query, row: &Row<'_>) -> Result<BookRef,
     }))
 }
 
+fn sanitize(filename: &str) -> String {
+    filename
+        .chars()
+        .filter(|c| {
+            c.is_ascii_alphanumeric()
+                || c.is_ascii_whitespace()
+                || c == &'-'
+                || c == &'_'
+                || c == &','
+                || c == &'.'
+        })
+        .collect::<String>()
+}
+
 fn download_path(config: &Config, authors: &String, title: &String, format: &String) -> PathBuf {
     let author_subfolder = config.get::<bool>("authorSubfolder").unwrap_or_default();
     let filename = match author_subfolder {
-        true => PathBuf::from(authors).join(title).with_extension(format),
-        false => PathBuf::from(format!("{} - {}", authors, title)).with_extension(format),
+        true => PathBuf::from(sanitize(authors))
+            .join(sanitize(title))
+            .with_extension(format),
+        false => PathBuf::from(format!("{} - {}", sanitize(authors), sanitize(title)))
+            .with_extension(format),
     };
     let download_path = config.get::<String>("downloadPath").unwrap_or_default();
     let path = &Path::new(&download_path).join(filename);

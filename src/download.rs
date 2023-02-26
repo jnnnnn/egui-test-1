@@ -91,11 +91,26 @@ fn start_download(
     let maybe_bytes = runtime.block_on(download_race(hosts, book));
     match maybe_bytes {
         Ok(bytes) => {
-            status.description = f!("Writing {book.title} to disk");
+            let kb = bytes.len() / 1024;
+            status.description = f!("Writing {book.title} to disk, {kb} KiB");
             status_send.send(status.clone())?;
             std::fs::create_dir_all(path.parent().unwrap())?;
-            std::fs::write(path, bytes)?;
-            log::info!("Wrote {}", path.display());
+            // write and flush the file to disk
+            std::fs::write(path, &bytes)?;
+            log::info!("Wrote {kb} KiB {}", path.display());
+            // assert that the file size is correct
+            let metadata = std::fs::metadata(path)?;
+            let size = metadata.len() as usize;
+            if size != bytes.len() {
+                return Err(format!(
+                    "File size mismatch: expected {} bytes, got {} bytes",
+                    bytes.len(),
+                    size
+                )
+                .into());
+            } else {
+                log::info!("File size matches: {} bytes", size);
+            }
             status.completed += 1;
             status.description = f!("Downloaded {book.title}");
             if let Ok(mut s) = book.download_status.write() {
