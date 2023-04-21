@@ -150,3 +150,8 @@ Writing the dedup logic is too hard in sql.
 ## 2023-02-01
 
 better compress script.
+
+## 2023-04-21
+
+In honour of Rust 1.69.0 on 20 April 2023, update dependencies.
+
