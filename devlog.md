@@ -155,3 +155,29 @@ better compress script.
 
 In honour of Rust 1.69.0 on 20 April 2023, update dependencies.
 
+## 2023-09-19
+
+update dependencies; update database. 
+
+```sh
+$ sqlite3 db.sqlite < libgen_compact_sqlite.sql
+memory
+Parse error near line 2557: near "SET": syntax error
+   FOR EACH ROW BEGIN  INSERT INTO `updated_edited` SET  `Title` = OLD.`Title`,
+                                      error here ---^
+```
+
+## 2023-09-26
+
+not working. write new script.
+
+Make dumps easier to handle in vim by adding newlines between value rows:
+
+```sh
+sed 's/),(/),\n(/g' dump.sql > dump2.sql
+```
+
+## 2023-09-27
+
+updated no good, no ipfs_cid. Use full. Try convert again.
+
