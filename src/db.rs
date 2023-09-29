@@ -135,7 +135,7 @@ impl DB {
         let stmt = if self.config.get::<bool>("compressedDb").unwrap_or(false) {
             format!("
             SELECT title, author as authors, series, year, language, publisher, filesize as sizeinbytes, extension as format, ipfs_cid
-            FROM fiction_mini f
+            FROM {0}_mini f
             WHERE 
                 f.title LIKE '%'||:title||'%' AND 
                 f.author LIKE '%'||:authors||'%' AND
@@ -143,7 +143,10 @@ impl DB {
                 f.language LIKE '%'||:language||'%' AND
                 f.extension LIKE '%'||:format||'%'
             ORDER BY f.author, f.title, f.filesize
-            ")
+            ", match params.collection {
+                Collection::NonFiction => "non_fiction",
+                _ => "fiction",
+            })
         } else {
             format!("
             SELECT f.title, f.author as authors, f.series, f.year, f.language, f.publisher, f.filesize as sizeinbytes, f.extension as format, fh.ipfs_cid as ipfs_cid

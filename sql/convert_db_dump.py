@@ -9,17 +9,19 @@ sourcepath = (
     sys.argv[1] if len(sys.argv) > 1 else r"C:\Users\J\Downloads\libgren\libgen.sql"
 )
 
+dbpath = os.path.splitext(sourcepath)[0] + ".sqlite"
+
 print(f"Source file: {sourcepath}")
 
 structspath = os.path.splitext(sourcepath)[0] + ".struct.sql"
 
-SCHEMA_WITHOUT_INSERTS = True
+SCHEMA_WITHOUT_INSERTS = False
 
 if SCHEMA_WITHOUT_INSERTS:
     with open(structspath, "w", encoding="utf-8") as struct:
         with open(sourcepath, "r", encoding="utf-8", errors="replace") as source:
             insert_count = 0
-            for line in tqdm(source):
+            for line in tqdm(source, total=20000):
 
                 if line.startswith("INSERT INTO"):
                     insert_count += 1
@@ -44,6 +46,15 @@ def convert_sql(code):
     except:
         print("problematic text in temp.sql")
         raise
+
+    with open("temp.sqlite.sql", "w", encoding="utf-8") as temp:
+        temp.write(result)
+
+    # insert in batches because passing a 20GB script into sqlite runs out of 32GB of memory
+    if dbpath:
+        with open("temp.sqlite.sql", "r", encoding="utf-8") as tempsqlite:
+            subprocess.run(["sqlite3.exe", dbpath], stdin=tempsqlite)
+
     os.remove("temp.sql")
     return result
 
