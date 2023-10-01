@@ -181,3 +181,10 @@ sed 's/),(/),\n(/g' dump.sql > dump2.sql
 
 updated no good, no ipfs_cid. Use full. Try convert again.
 
+## 2023-10-02
+
+success. combined dbs, minified, 1.4GB. 7-zip compresses to 400MB. ✓
+
+project is functionally complete. Could still make like a download progress bar or something, and a web server / eframe client. But it's good enough.
+
+If there were incremental DB updates that would be the next step. Downloading the whole DB every year seems a little wasteful.
