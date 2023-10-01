@@ -79,14 +79,9 @@ with open(sqlitepath, "w", encoding="utf-8") as sqlite:
                 count += 1
         sqlite.write(convert_sql(accumulator))
 
-print(f"SQLITE Done. Result file: {sqlitepath}")
-
 print(f"""
-Create the sql db with: 
+      SQLITE Done. Result: {dbpath}
       
-    sqlite3 libgen.db < {sqlitepath}
-
-and then compress it using the appropriate compress sql, for example:
-
-    sqlite3 libgen.db < compress-fiction.sql
+      You should now run the following command to drop unnecessary data and create the search index:
+          sqlite3 whatever-your-db-is.sqlite < compress-fiction.sql
 """)
